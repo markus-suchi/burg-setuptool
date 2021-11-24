@@ -15,11 +15,11 @@ git clone --recursive git@github.com:markus-suchi/burg-toolkit-gui.git [dest-dir
 ```
 ./python3.7m -m ensurepip
 ./python3.7m -m pip install --upgrade pip
-./python3.7m --upgrade setuptools wheel
+./python3.7m -m pip install --upgrade setuptools wheel
 ```
 - Install all dependencies from burg-toolkit into blender local python package storage.
 ```
-./python3.7m -m pip install -e  <path to repository>/burg-toolkit/setup.py
+./python3.7m -m pip install -e  <path to repository>/burg-toolkit/['collision']
 ```
 ### packaged addon
 TODO
