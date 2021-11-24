@@ -1,6 +1,6 @@
 # Setup GUI for BURG toolkit
 
-This is a blender addon which provides a GUI for setting up setup scenes templates.
+This is a blender addon which provides a GUI for creating burg-toolkit setup templates.
 
 ## installation
 ### development
@@ -9,7 +9,7 @@ This is a blender addon which provides a GUI for setting up setup scenes templat
 git clone --recursive git@github.com:markus-suchi/burg-toolkit-gui.git [dest-dir]
 ```
 - Download [blender 2.92](https://download.blender.org/release/Blender2.92/) for your platform and extract it.
-- Locate blenders addon folder (<extract dir>/2.92/scripts/addons) create a link to this repository root dir.
+- Locate blenders addon folder (<extract dir>/2.92/scripts/addons) ***create a link*** to this repository root dir.
 - Locate and change to blenders python folder (<extract dir>/2.92/python/bin)
 - Enable pip for blender using the shipped python package of blender
 ```
