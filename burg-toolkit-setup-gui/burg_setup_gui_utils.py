@@ -131,7 +131,6 @@ def update_lock_transform(self, context):
 def update_display_colors(self, context):
     if "objects" in bpy.data.collections:
         burg_params = context.scene.burg_params
-        print("update_display_colors")
         if burg_params.view_mode == 'view_color':
             print("view color")
             for o in bpy.data.collections["objects"].objects:
