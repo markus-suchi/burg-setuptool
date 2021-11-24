@@ -38,9 +38,10 @@ class BURG_OT_update_scene(bpy.types.Operator):
         if scene:
             utils.update_scene(scene)
             burg_params = bpy.context.scene.burg_params
-            utils.simulate_scene(scene, verbose=burg_params.view_simulation)
-            utils.update_objects(scene)
-            utils.check_status(scene)
+            if(utils.check_status(scene)):
+                utils.simulate_scene(scene, verbose=burg_params.view_simulation)
+                utils.update_objects(scene)
+                utils.check_status(scene)
             utils.trigger_display_update(burg_params)
             return{'FINISHED'}
         else:

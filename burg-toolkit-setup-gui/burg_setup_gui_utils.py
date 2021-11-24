@@ -72,15 +72,17 @@ def load_objects(scene):
 def check_status(scene):
     collision_objects = scene.colliding_instances()
     out_of_bounds_objects = scene.out_of_bounds_instances()
-
+    status_ok = True
     for o in bpy.data.collections["objects"].objects:
         if o["burg_oid"] in collision_objects:
             o["burg_status"] = BurgStatus.COLLISION
+            status_ok = False
         elif o["burg_oid"] in out_of_bounds_objects:
             o["burg_status"] = BurgStatus.OUT_OF_BOUNDS
+            status_ok = False
         else:
             o["burg_status"] = BurgStatus.OK
-
+    return status_ok
 
 def update_scene(scene):
     for o in bpy.data.collections["objects"].objects:
