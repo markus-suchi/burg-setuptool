@@ -2,6 +2,9 @@ import bpy
 import burg_toolkit as burg
 import burg_setup_gui_utils as utils
 
+import numpy as np
+from PIL import Image
+
 object_library = None
 scene = None
 
@@ -101,6 +104,44 @@ class BURG_OT_load_object_library(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
+class BURG_OT_save_printout(bpy.types.Operator):
+    """ Saving setup printout to file. """
+
+    bl_idname = "burg.save_printout"
+    bl_label = "Save Printout"
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="printout.png")
+
+    def execute(self, context):
+        global scene
+
+        try:
+            #scene = burg.sampling.sample_scene(lib, burg.constants.SIZE_A2, instances_per_scene=5, instances_per_object=1)
+            printout = burg.Printout(burg.constants.SIZE_A2)
+            printout.add_scene(scene)
+            layout_img = printout.generate()
+            h, w = np.shape(layout_img)
+            byte_to_normalized = 1.0 / 255.0
+            pil_image = Image.fromarray(layout_img)
+            pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
+            image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
+            image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),dtype=np.float32) * byte_to_normalized).ravel()
+            image.filepath_raw = self.filepath 
+            image.file_format = 'PNG'
+            image.save()          
+            del image
+            return {'FINISHED'}
+        except Exception as e:
+            print(f"Could not save template file: {self.filepath}.")
+            print(e)
+            return {'CANCELLED'}
+
+    def invoke(self, context, event):
+        # set filepath with default value of property
+        self.filepath = self.filepath
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+
 class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
     bl_label = "BURG Setup Gui"
     bl_idname = "BURG_PT_setup_gui"
@@ -147,6 +188,9 @@ class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
         row.prop(burg_params, "view_mode", text="Display", expand=True)
         row = layout.row()
         row.prop(burg_params, "lock_transform")
+        row = layout.row()
+        row.operator("burg.save_printout")
+
 
 
 class BURG_PG_params(bpy.types.PropertyGroup):
@@ -169,6 +213,7 @@ def register():
     bpy.utils.register_class(BURG_OT_create_scene)
     bpy.utils.register_class(BURG_OT_update_scene)
     bpy.utils.register_class(BURG_OT_load_object_library)
+    bpy.utils.register_class(BURG_OT_save_printout)
     bpy.utils.register_class(BURG_PG_params)
 
     bpy.types.Scene.burg_params = bpy.props.PointerProperty(
@@ -180,6 +225,7 @@ def unregister():
     bpy.utils.unregister_class(BURG_OT_create_scene)
     bpy.utils.unregister_class(BURG_OT_update_scene)
     bpy.utils.unregister_class(BURG_OT_load_object_library)
+    bpy.utils.unregister_class(BURG_OT_save_printout)
     bpy.utils.unregister_class(BURG_PG_params)
 
     del bpy.types.Scene.burg_params
