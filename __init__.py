@@ -19,7 +19,7 @@ else:
     import sys
 
     # --- create the startup file for the burg setup gui ---
-    script_file = os.path.realpath(__file__)
+    script_file = os.path.abspath(__file__)
     addon_dir = os.path.dirname(script_file)
 
     addon_dir_link, _ = os.path.split(os.path.dirname(__file__))
