@@ -42,7 +42,8 @@ class BURG_OT_update_scene(bpy.types.Operator):
             utils.update_scene(scene)
             burg_params = bpy.context.scene.burg_params
             if(utils.check_status(scene)):
-                utils.simulate_scene(scene, verbose=burg_params.view_simulation)
+                utils.simulate_scene(
+                    scene, verbose=burg_params.view_simulation)
                 utils.update_objects(scene)
                 utils.check_status(scene)
             utils.trigger_display_update(burg_params)
@@ -109,26 +110,21 @@ class BURG_OT_save_printout(bpy.types.Operator):
 
     bl_idname = "burg.save_printout"
     bl_label = "Save Printout"
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="printout.png")
+    filepath: bpy.props.StringProperty(
+        subtype="FILE_PATH", default="printout.pdf")
 
     def execute(self, context):
         global scene
 
         try:
-            #scene = burg.sampling.sample_scene(lib, burg.constants.SIZE_A2, instances_per_scene=5, instances_per_object=1)
-            printout = burg.Printout(burg.constants.SIZE_A2)
+            burg_params = context.scene.burg_params
+            # TODO: printout size for Printout is the actual workspace size
+            # For saving this size will be scaled or split in another size
+            printout = burg.Printout(size=burg.constants.SIZE_A2)
             printout.add_scene(scene)
-            layout_img = printout.generate()
-            h, w = np.shape(layout_img)
-            byte_to_normalized = 1.0 / 255.0
-            pil_image = Image.fromarray(layout_img)
-            pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
-            image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
-            image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),dtype=np.float32) * byte_to_normalized).ravel()
-            image.filepath_raw = self.filepath 
-            image.file_format = 'PNG'
-            image.save()          
-            del image
+            print_size = utils.get_printout_size(burg_params.printout_size)
+            printout.save_pdf(self.filepath, page_size=print_size,
+                              margin_mm=burg_params.printout_margin)
             return {'FINISHED'}
         except Exception as e:
             print(f"Could not save template file: {self.filepath}.")
@@ -188,9 +184,11 @@ class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
         row.prop(burg_params, "view_mode", text="Display", expand=True)
         row = layout.row()
         row.prop(burg_params, "lock_transform")
+        layout.label(text="Printout:")
         row = layout.row()
-        row.operator("burg.save_printout")
-
+        row.operator("burg.save_printout", text='Save')
+        row.prop(burg_params, "printout_size", text='')
+        row.prop(burg_params, "printout_margin", text='')
 
 
 class BURG_PG_params(bpy.types.PropertyGroup):
@@ -206,6 +204,13 @@ class BURG_PG_params(bpy.types.PropertyGroup):
         items=[('view_color', 'Color', 'Object Color', '', 0),
                ('view_state', 'State', 'Object State', '', 1)],
         default=0, update=utils.update_display_colors)
+    printout_size: bpy.props.EnumProperty(
+        items=[('SIZE_A2', 'A2', 'Size A2', '', 0),
+               ('SIZE_A3', 'A3', 'Size A3', '', 1),
+               ('SIZE_A4', 'A4', 'Size A4', '', 2)],
+        default=2)
+    printout_margin: bpy.props.FloatProperty(
+        name="Printout Margin", default=0.0, min=0.0)
 
 
 def register():

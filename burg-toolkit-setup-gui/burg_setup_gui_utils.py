@@ -20,6 +20,14 @@ BURG_STATUS_COLORS = {BurgStatus.OK: (0, 1, 0),
                       BurgStatus.COLLISION: (1, 0, 0),
                       BurgStatus.OUT_OF_BOUNDS: (1, 0, 1)}
 
+BURG_PRINTOUT_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
+                       "SIZE_A3": burg.constants.SIZE_A3,
+                       "SIZE_A4": burg.constants.SIZE_A4}
+
+
+def get_printout_size(size):
+    return BURG_PRINTOUT_SIZES[size]
+
 
 def create_scene(object_library, n_instances=1, n_instances_objects=1):
     # TODO: Error handling
@@ -84,6 +92,7 @@ def check_status(scene):
             o["burg_status"] = BurgStatus.OK
     return status_ok
 
+
 def update_scene(scene):
     for o in bpy.data.collections["objects"].objects:
         obj_id = o["burg_oid"]
@@ -134,13 +143,23 @@ def update_display_colors(self, context):
     if "objects" in bpy.data.collections:
         burg_params = context.scene.burg_params
         if burg_params.view_mode == 'view_color':
-            print("view color")
             for o in bpy.data.collections["objects"].objects:
-                print("setting color")
                 o.color = o["burg_color"]
         elif burg_params.view_mode == 'view_state':
             for o in bpy.data.collections["objects"].objects:
                 o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
+
+
+def image_from_numpy(image, name="default"):
+    h, w = np.shape(layout_img)
+    byte_to_normalized = 1.0 / 255.0
+    pil_image = Image.fromarray(layout_img)
+    pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
+    image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
+    image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),
+                       dtype=np.float32) * byte_to_normalized).ravel()
+    image.file_format = 'PNG'
+    return image
 
 
 def trigger_display_update(params):
