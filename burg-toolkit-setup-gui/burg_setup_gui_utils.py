@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 
 import burg_toolkit as burg
 
-dim = (0.594, 0.42)
-
 
 class BurgStatus(IntEnum):
     OK = 0
@@ -25,108 +23,290 @@ BURG_PRINTOUT_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
                        "SIZE_A4": burg.constants.SIZE_A4}
 
 
+def image_from_numpy(image, name="default"):
+    """
+    Converts numpy image to blender image
+
+    :param: image as numpy array
+    :param: name of the image in blender
+    """
+    h, w = np.shape(layout_img)
+    byte_to_normalized = 1.0 / 255.0
+    pil_image = Image.fromarray(layout_img)
+    pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
+    image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
+    image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),
+                       dtype=np.float32) * byte_to_normalized).ravel()
+    image.file_format = 'PNG'
+    return image
+
+
 def get_printout_size(size):
     return BURG_PRINTOUT_SIZES[size]
 
 
-def create_scene(object_library, n_instances=1, n_instances_objects=1):
-    # TODO: Error handling
-    scene = burg.sampling.sample_scene(
-        object_library,
-        ground_area=dim,
-        instances_per_scene=n_instances,
-        instances_per_object=n_instances_objects
-    )
-    return scene
+def singleton(cls):
+    instances = {}
+
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
 
 
-def load_objects(scene):
-    if "objects" not in bpy.data.collections:
-        # deselect all
-        bpy.ops.object.select_all(action='DESELECT')
-        obj_collection = bpy.ops.collection.create(name="objects")
-        bpy.context.scene.collection.children.link(
-            bpy.data.collections["objects"])
+@singleton
+class SceneManager(object):
+    """
+    Manages access between burg objects and blender objects.
 
-    colormap = plt.get_cmap('tab20')
-    color_idx = 0
-    for i, item in enumerate(scene.objects):
-        o3d_mesh = item.object_type.mesh
-        pose = item.pose
-        blender_mesh = bpy.data.meshes.new(
-            str(i) + '_' + item.object_type.identifier)
-        blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
-        obj_id = i
-        obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
-        obj.matrix_world = mathutils.Matrix(pose)
-        r, g, b = colormap(color_idx)[0:3]
-        obj.color = (r, g, b, 1)
-        bpy.data.collections["objects"].objects.link(obj)
-        color_idx = (color_idx + 1) % colormap.N
-        obj["burg_oid"] = obj_id
-        obj["burg_status"] = BurgStatus.OK
-        obj["burg_color"] = (r, g, b, 1)
-        # check if material for objects is there
-        if not "burg_object_material" in bpy.data.materials:
-            print("The material for displaying object colors is missing.")
+    """
+
+    def __init__(self):
+        print("init")
+        self.blender_to_burg = {}
+        self.object_library = None
+        self.scene = None
+        self.object_library_file = None
+
+    def same_object_library(self, object_library_file=None):
+        return self.object_library_file == object_library_file
+
+    def load_object_library(self, filepath):
+        """
+        Loads and updates object library related interface items.
+
+        :param filepath: Path to a object library yaml file
+        """
+
+        if not filepath or not os.path.isfile(filepath):
+            raise ValueError(
+                "Object Library File {object_lib_file} does not exist.")
+
+        if self.same_object_library(filepath):
+            return
         else:
-            object_material = bpy.data.materials["burg_object_material"]
-            for o in bpy.data.collections["objects"].objects:
+            print("New object_library")
+            self.object_library = burg.ObjectLibrary.from_yaml(filepath)
+            print(self.object_library)
+            self.object_library_file = filepath
+
+            # cleanup preview collection
+            # cleanup scene
+
+    def random_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, n_instances=1, n_instances_objects=1):
+        """
+        Creates a random scene.
+
+        :param object_library_file: Path to a object library yaml file
+        :param ground_area: Size of the working area.
+        :param n_instances: Number of object instances per scene.
+        :param n_instances_objects: Number of instances per object.
+        """
+
+        self.load_object_library(object_library_file)
+
+        if self.scene:
+            print("removing current scene")
+
+        # create the new scene
+        self.scene = burg.sampling.sample_scene(
+            object_library=self.object_library,
+            ground_area=ground_area,
+            instances_per_scene=n_instances,
+            instances_per_object=n_instances_objects
+        )
+
+    def empty_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3):
+        """
+        Creates an empty scene.
+
+        :param object_library_file: Path to a object library yaml file
+        :param ground_area: Size of the working area.
+        """
+
+        self.load_object_library(object_library_file)
+
+        if self.scene:
+            print("removing current scene")
+            self.remove_blender_objects()
+
+        self.scene = burg.core.Scene(ground_area=ground_area)
+
+    def load_objects(self):
+        """
+        Loads objects from current scene into blender.
+        """
+
+        if not self.scene:
+            return
+
+        if "objects" not in bpy.data.collections:
+            # deselect all
+            bpy.ops.object.select_all(action='DESELECT')
+            obj_collection = bpy.ops.collection.create(name="objects")
+            bpy.context.scene.collection.children.link(
+                bpy.data.collections["objects"])
+
+        colormap = plt.get_cmap('tab20')
+        color_idx = 0
+        for i, item in enumerate(self.scene.objects):
+            o3d_mesh = item.object_type.mesh
+            pose = item.pose
+
+            # TODO: Here we still make an name out of the type and not the instance
+            blender_mesh = bpy.data.meshes.new(
+                str(i) + '_' + item.object_type.identifier)
+            blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
+            obj_id = i
+            obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
+            obj.matrix_world = mathutils.Matrix(pose)
+
+            bpy.data.collections["objects"].objects.link(obj)
+            obj["burg_oid"] = obj_id
+            obj["burg_status"] = BurgStatus.OK
+            color_idx = (color_idx + 1) % colormap.N
+            r, g, b = colormap(color_idx)[0:3]
+            obj.color = (r, g, b, 1)
+            obj["burg_color"] = (r, g, b, 1)
+            # check if material for objects is there
+            if not "burg_object_material" in bpy.data.materials:
+                print("The material for displaying object colors is missing.")
+            else:
+                object_material = bpy.data.materials["burg_object_material"]
                 # check if we already have appended the materials
-                if len(o.material_slots) < 1:  # if no materials on the object
-                    o.data.materials.append(object_material)
+                if len(obj.material_slots) < 1:  # if no materials on the object
+                    obj.data.materials.append(object_material)
 
+            # create connection between scene and blender object
+            self.blender_to_burg[obj] = item
 
-def check_status(scene):
-    collision_objects = scene.colliding_instances()
-    out_of_bounds_objects = scene.out_of_bounds_instances()
-    status_ok = True
-    for o in bpy.data.collections["objects"].objects:
-        if o["burg_oid"] in collision_objects:
-            o["burg_status"] = BurgStatus.COLLISION
-            status_ok = False
-        elif o["burg_oid"] in out_of_bounds_objects:
-            o["burg_status"] = BurgStatus.OUT_OF_BOUNDS
-            status_ok = False
-        else:
-            o["burg_status"] = BurgStatus.OK
-    return status_ok
+    def check_status(self):
+        """
+        Checks the status of all object in the scene using simulation.
+        """
 
+        if not self.scene:
+            return
 
-def update_scene(scene):
-    for o in bpy.data.collections["objects"].objects:
-        obj_id = o["burg_oid"]
-        pose = np.zeros((4, 4))
-        pose[:, :] = o.matrix_world
-        burg_object = scene.objects[obj_id]
-        burg_object.pose = pose
-
-
-def update_objects(scene):
-    for o in bpy.data.collections["objects"].objects:
-        obj_id = o["burg_oid"]
-        o.matrix_world = mathutils.Matrix(scene.objects[obj_id].pose)
-
-
-def remove_objects():
-    # TODO: do not reimport already loaded objects, just reset position
-    if "objects" in bpy.data.collections:
+        collision_objects = self.scene.colliding_instances()
+        out_of_bounds_objects = self.scene.out_of_bounds_instances()
+        status_ok = True
         for o in bpy.data.collections["objects"].objects:
-            m = bpy.data.meshes[o.name]
-            bpy.data.objects.remove(o, do_unlink=True)
-            bpy.data.meshes.remove(m, do_unlink=True)
+            if o["burg_oid"] in collision_objects:
+                o["burg_status"] = BurgStatus.COLLISION
+                status_ok = False
+            elif o["burg_oid"] in out_of_bounds_objects:
+                o["burg_status"] = BurgStatus.OUT_OF_BOUNDS
+                status_ok = False
+            else:
+                o["burg_status"] = BurgStatus.OK
+        return status_ok
 
+    def update_scene_poses(self):
+        """
+        Updates poses of all object instances of current scene.
+        """
 
-def simulate_scene(scene, verbose=True):
-    # TODO: Error handling
-    # verbose shows the simulator GUI, slower than real-time
-    sim = burg.scene_sim.SceneSimulator(verbose=verbose)
-    # the poses of all instances in the scene are automatically updated by the simulator
-    sim.simulate_scene(scene)
-    sim.dismiss()  # can also reuse, then the window stays open
+        for o in bpy.data.collections["objects"].objects:
+            pose = np.zeros((4, 4))
+            pose[:, :] = o.matrix_world
+            burg_object = self.blender_to_burg[o]
+            burg_object.pose = pose
+
+    def update_blender_poses(self):
+        """
+        Updates poses of all blender objects from current scene.   
+        """
+
+        for o in bpy.data.collections["objects"].objects:
+            o.matrix_world = mathutils.Matrix(self.blender_to_burg[o].pose)
+
+    def remove_blender_objects(self):
+        """
+        Removes all blender objects and their meshes   
+        """
+
+        if "objects" in bpy.data.collections:
+            for o in bpy.data.collections["objects"].objects:
+                m = bpy.data.meshes[o.name]
+                bpy.data.objects.remove(o, do_unlink=True)
+                bpy.data.meshes.remove(m, do_unlink=True)
+
+        self.blender_to_burg.clear()
+
+    def simulate_scene(self, verbose=True):
+        """
+        Simulates current scene
+
+        :param verbose: Visualize simulation. 
+        """
+
+        if not self.scene:
+            return
+
+        # TODO: Error handling
+        # verbose shows the simulator GUI, slower than real-time
+        sim = burg.scene_sim.SceneSimulator(verbose=verbose)
+        # the poses of all instances in the scene are automatically updated by the simulator
+        sim.simulate_scene(self.scene)
+        sim.dismiss()  # can also reuse, then the window stays open
+
+    def add_objects(self, id):
+        """
+        Adds an object with specific id to the scene and blender 
+
+        :param id: Unique object identifier. 
+        """
+
+        print("adding object")
+
+        if not self.scene:
+            return
+
+        if "objects" not in bpy.data.collections:
+            # deselect all
+            bpy.ops.object.select_all(action='DESELECT')
+            obj_collection = bpy.ops.collection.create(name="objects")
+            bpy.context.scene.collection.children.link(
+                bpy.data.collections["objects"])
+
+        # get new instance id
+        instance_id = len(bpy.data.collections["objects"].objects)
+
+        # create mesh if it is a new instance
+        if self.object_library[id].stable_poses:
+            stable_pose = self.object_library[id].stable_poses[0][1]
+        else:
+            stable_pose = np.eye(4)
+
+        print(stable_pose)
+        instance = burg.ObjectInstance(
+            self.object_library[id], pose=stable_pose)
+
+        # TODO: find better unique identifier for meshes
+        mesh_id = f"burg_{id}"
+        if bpy.data.meshes.get(mesh_id):
+            print("Mesh is already there")
+            blender_mesh = bpy.data.meshes.get(mesh_id)
+        else:
+            print(f"Create new Mesh for burg object {id}")
+            o3d_mesh = instance.get_mesh()
+            blender_mesh = bpy.data.meshes.new(mesh_id)
+            blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
+
+        obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
+        # TODO:  how to retrieve custom color
+        obj.color = (155, 15, 0, 1)
+        bpy.data.collections["objects"].objects.link(obj)
+        self.blender_to_burg[obj] = instance
+        obj["burg_oid"] = instance_id
 
 
 def update_lock_transform(self, context):
+    if "objects" not in bpy.data.collections:
+        return
+
     burg_params = context.scene.burg_params
     for o in bpy.data.collections["objects"].objects:
         if burg_params.lock_transform:
@@ -148,18 +328,6 @@ def update_display_colors(self, context):
         elif burg_params.view_mode == 'view_state':
             for o in bpy.data.collections["objects"].objects:
                 o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
-
-
-def image_from_numpy(image, name="default"):
-    h, w = np.shape(layout_img)
-    byte_to_normalized = 1.0 / 255.0
-    pil_image = Image.fromarray(layout_img)
-    pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
-    image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
-    image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),
-                       dtype=np.float32) * byte_to_normalized).ravel()
-    image.file_format = 'PNG'
-    return image
 
 
 def trigger_display_update(params):

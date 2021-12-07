@@ -5,31 +5,29 @@ import burg_setup_gui_utils as utils
 import numpy as np
 from PIL import Image
 
-object_library = None
-scene = None
+# the one and only manager
+mng = utils.SceneManager()
 
 
-class BURG_OT_create_scene(bpy.types.Operator):
-    bl_idname = "burg.create_scene"
+class BURG_OT_random_scene(bpy.types.Operator):
+    bl_idname = "burg.random_scene"
     bl_label = "Create Random Scene"
 
     def execute(self, context):
-        global object_library
-        global scene
-
-        if object_library:
-            burg_params = context.scene.burg_params
-            scene = utils.create_scene(
-                object_library,  n_instances=burg_params.number_objects, n_instances_objects=burg_params.number_instances)
-            utils.simulate_scene(scene, verbose=burg_params.view_simulation)
-            utils.remove_objects()
-            utils.load_objects(scene)
-            utils.check_status(scene)
-            utils.trigger_display_update(burg_params)
-            return {'FINISHED'}
-        else:
-            print('Open object library first.')
-            return {'CANCELLED'}
+        burg_params = context.scene.burg_params
+        print_size = utils.get_printout_size(burg_params.printout_size)
+        mng.random_scene(burg_params.object_library_file,
+                         n_instances=burg_params.number_objects,
+                         ground_area=utils.get_printout_size(
+                             burg_params.area_size),
+                         n_instances_objects=burg_params.number_instances)
+        mng.simulate_scene(verbose=burg_params.view_simulation)
+        mng.remove_blender_objects()
+        mng.load_objects()
+        mng.check_status()
+        utils.update_lock_transform(self, context)
+        utils.trigger_display_update(burg_params)
+        return {'FINISHED'}
 
 
 class BURG_OT_update_scene(bpy.types.Operator):
@@ -37,43 +35,13 @@ class BURG_OT_update_scene(bpy.types.Operator):
     bl_label = "Update Scene"
 
     def execute(self, context):
-        global scene
-        if scene:
-            utils.update_scene(scene)
-            burg_params = bpy.context.scene.burg_params
-            if(utils.check_status(scene)):
-                utils.simulate_scene(
-                    scene, verbose=burg_params.view_simulation)
-                utils.update_objects(scene)
-                utils.check_status(scene)
-            utils.trigger_display_update(burg_params)
-            return{'FINISHED'}
-        else:
-            print("Create a scene first.")
-            return {'CANCELLED'}
-
-
-class BURG_OT_lock_objects(bpy.types.Operator):
-    bl_idname = "burg.lock_objects"
-    bl_label = "Restricted"
-
-    def set_transform_lock(object=None, enabled=False):
-        if object:
-            object.lock_location[2] = enabled
-            object.lock_rotation_euler[0] = enabled
-            object.lock_rotation_euler[1] = enabled
-
-    def execute(self, context):
-        burg_params = context.scene.burg_params
-        if burg_params.lock_transform:
-            for o in bpy.data.collections["objects"].objects:
-                set_transform_lock(o, True)
-                burg_params.lock_transform = True
-        else:
-            # unlock transformation retsirctions
-            for o in bpy.data.collections["objects"].objects:
-                set_transform_lock(o, False)
-                burg_params.lock_transform = False
+        mng.update_scene_poses()
+        burg_params = bpy.context.scene.burg_params
+        if(mng.check_status()):
+            mng.simulate_scene(verbose=burg_params.view_simulation)
+            mng.update_blender_poses()
+            mng.check_status()
+        utils.trigger_display_update(burg_params)
         return{'FINISHED'}
 
 
@@ -86,13 +54,11 @@ class BURG_OT_load_object_library(bpy.types.Operator):
     loaded: bpy.props.BoolProperty(name="loaded", default=False)
 
     def execute(self, context):
-        global object_library
-
         try:
             # TODO: Error handling when opening incomplete/not processed library file.
-            object_library = burg.ObjectLibrary.from_yaml(self.filepath)
             burg_params = context.scene.burg_params
             burg_params.object_library_file = self.filepath
+            mng.empty_scene(burg_params.object_library_file)
             return {'FINISHED'}
         except Exception:
             print(f"Could not open burg object library: {self.filepath}.")
@@ -114,15 +80,14 @@ class BURG_OT_save_printout(bpy.types.Operator):
         subtype="FILE_PATH", default="printout.pdf")
 
     def execute(self, context):
-        global scene
-
         try:
+            if not mng.scene:
+                return
+
             burg_params = context.scene.burg_params
-            # TODO: printout size for Printout is the actual workspace size
-            # For saving this size will be scaled or split in another size
-            printout = burg.Printout(size=burg.constants.SIZE_A2)
-            printout.add_scene(scene)
             print_size = utils.get_printout_size(burg_params.printout_size)
+            printout = burg.Printout(size=mng.scene.ground_area)
+            printout.add_scene(mng.scene)
             printout.save_pdf(self.filepath, page_size=print_size,
                               margin_mm=burg_params.printout_margin)
             return {'FINISHED'}
@@ -138,7 +103,7 @@ class BURG_OT_save_printout(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
+class BURG_PT_setup_gui(bpy.types.Panel):
     bl_label = "BURG Setup Gui"
     bl_idname = "BURG_PT_setup_gui"
     bl_space_type = "VIEW_3D"
@@ -156,19 +121,24 @@ class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
         layout.use_property_decorate = False
 
         scene = context.scene
-        flow = layout.grid_flow(row_major=True, columns=0,
-                                even_columns=True, even_rows=False, align=True)
+        flow = layout.grid_flow(row_major=True,
+                                columns=0,
+                                even_columns=True,
+                                even_rows=False,
+                                align=True)
 
         burg_params = scene.burg_params
-        layout.label(text="Config:")
+        # layout.label(text="Config:")
         row = layout.row()
         row.enabled = False
         row.prop(burg_params, "object_library_file")
         row = layout.row()
+        row.prop(burg_params, "area_size")
+        row = layout.row()
         row.operator("burg.load_object_library", text='Open')
         col = layout.column()
         col.separator()
-        layout.label(text="Creation:")
+        # layout.label(text="Creation:")
         row = layout.row()
         row.prop(burg_params, "number_objects")
         row = layout.row()
@@ -176,8 +146,8 @@ class BURG_PT_setup_gui_VIEW_3D(bpy.types.Panel):
         row = layout.row()
         row.prop(burg_params, "view_simulation")
         row = layout.row()
-        row.operator("burg.create_scene")
-        layout.label(text="Verification:")
+        row.operator("burg.random_scene")
+        # layout.label(text="Verification:")
         row = layout.row()
         row.operator("burg.update_scene")
         row = layout.row()
@@ -208,14 +178,19 @@ class BURG_PG_params(bpy.types.PropertyGroup):
         items=[('SIZE_A2', 'A2', 'Size A2', '', 0),
                ('SIZE_A3', 'A3', 'Size A3', '', 1),
                ('SIZE_A4', 'A4', 'Size A4', '', 2)],
-        default=2)
+        default=1)
+    area_size: bpy.props.EnumProperty(
+        items=[('SIZE_A2', 'A2', 'Size A2', '', 0),
+               ('SIZE_A3', 'A3', 'Size A3', '', 1),
+               ('SIZE_A4', 'A4', 'Size A4', '', 2)],
+        default=1)
     printout_margin: bpy.props.FloatProperty(
         name="Printout Margin", default=0.0, min=0.0)
 
 
 def register():
-    bpy.utils.register_class(BURG_PT_setup_gui_VIEW_3D)
-    bpy.utils.register_class(BURG_OT_create_scene)
+    bpy.utils.register_class(BURG_PT_setup_gui)
+    bpy.utils.register_class(BURG_OT_random_scene)
     bpy.utils.register_class(BURG_OT_update_scene)
     bpy.utils.register_class(BURG_OT_load_object_library)
     bpy.utils.register_class(BURG_OT_save_printout)
@@ -226,8 +201,8 @@ def register():
 
 
 def unregister():
-    bpy.utils.unregister_class(BURG_PT_setup_gui_VIEW_3D)
-    bpy.utils.unregister_class(BURG_OT_create_scene)
+    bpy.utils.unregister_class(BURG_PT_setup_gui)
+    bpy.utils.unregister_class(BURG_OT_random_scene)
     bpy.utils.unregister_class(BURG_OT_update_scene)
     bpy.utils.unregister_class(BURG_OT_load_object_library)
     bpy.utils.unregister_class(BURG_OT_save_printout)
