@@ -41,7 +41,7 @@ def image_from_numpy(image, name="default"):
     return image
 
 
-def get_printout_size(size):
+def get_size(size):
     return BURG_PRINTOUT_SIZES[size]
 
 
@@ -63,7 +63,6 @@ class SceneManager(object):
     """
 
     def __init__(self):
-        print("init")
         self.blender_to_burg = {}
         self.object_library = None
         self.scene = None
@@ -90,9 +89,6 @@ class SceneManager(object):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
             print(self.object_library)
             self.object_library_file = filepath
-
-            # cleanup preview collection
-            # cleanup scene
 
     def random_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, n_instances=1, n_instances_objects=1):
         """
@@ -161,8 +157,6 @@ class SceneManager(object):
             obj_id = i
             obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
             obj.matrix_world = mathutils.Matrix(pose)
-
-            bpy.data.collections["objects"].objects.link(obj)
             obj["burg_oid"] = obj_id
             obj["burg_status"] = BurgStatus.OK
             color_idx = (color_idx + 1) % colormap.N
@@ -178,6 +172,7 @@ class SceneManager(object):
                 if len(obj.material_slots) < 1:  # if no materials on the object
                     obj.data.materials.append(object_material)
 
+            bpy.data.collections["objects"].objects.link(obj)
             # create connection between scene and blender object
             self.blender_to_burg[obj] = item
 
@@ -186,12 +181,13 @@ class SceneManager(object):
         Checks the status of all object in the scene using simulation.
         """
 
-        if not self.scene:
+        if not self.scene or "objects" not in bpy.data.collections:
             return
 
         collision_objects = self.scene.colliding_instances()
         out_of_bounds_objects = self.scene.out_of_bounds_instances()
         status_ok = True
+
         for o in bpy.data.collections["objects"].objects:
             if o["burg_oid"] in collision_objects:
                 o["burg_status"] = BurgStatus.COLLISION
@@ -208,30 +204,25 @@ class SceneManager(object):
         Updates poses of all object instances of current scene.
         """
 
-        for o in bpy.data.collections["objects"].objects:
-            pose = np.zeros((4, 4))
-            pose[:, :] = o.matrix_world
-            burg_object = self.blender_to_burg[o]
-            burg_object.pose = pose
+        for key, value in self.blender_to_burg.items():
+            value.pose[:, :] = key.matrix_world
 
     def update_blender_poses(self):
         """
         Updates poses of all blender objects from current scene.   
         """
 
-        for o in bpy.data.collections["objects"].objects:
-            o.matrix_world = mathutils.Matrix(self.blender_to_burg[o].pose)
+        for key, value in self.blender_to_burg.items():
+            key.matrix_world = mathutils.Matrix(value.pose)
 
     def remove_blender_objects(self):
         """
         Removes all blender objects and their meshes   
         """
-
-        if "objects" in bpy.data.collections:
-            for o in bpy.data.collections["objects"].objects:
-                m = bpy.data.meshes[o.name]
-                bpy.data.objects.remove(o, do_unlink=True)
-                bpy.data.meshes.remove(m, do_unlink=True)
+        for key in self.blender_to_burg.keys():
+            mesh = bpy.data.meshes[key.name]
+            bpy.data.objects.remove(key, do_unlink=True)
+            bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
 
@@ -302,21 +293,30 @@ class SceneManager(object):
         self.blender_to_burg[obj] = instance
         obj["burg_oid"] = instance_id
 
+    def lock_transform(self, enable=True):
+        """
+        Locks movement of objects: 
+        Translation restricted to x-y plane.
+        Rotation restricted to z axis.
 
-def update_lock_transform(self, context):
-    if "objects" not in bpy.data.collections:
-        return
+        :param enable: Enable/Disable lock. 
+        """
 
-    burg_params = context.scene.burg_params
-    for o in bpy.data.collections["objects"].objects:
-        if burg_params.lock_transform:
-            o.lock_location[2] = True
-            o.lock_rotation[0] = True
-            o.lock_rotation[1] = True
-        else:
-            o.lock_location[2] = False
-            o.lock_rotation[0] = False
-            o.lock_rotation[1] = False
+        for key in self.blender_to_burg.keys():
+            if enable:
+                key.lock_location[2] = True
+                key.lock_rotation[0] = True
+                key.lock_rotation[1] = True
+            else:
+                key.lock_location[2] = False
+                key.lock_rotation[0] = False
+                key.lock_rotation[1] = False
+
+    def is_valid_scene(self):
+        return self.scene or False
+
+    def is_valid_object_library(self):
+        return self.object_library or False
 
 
 def update_display_colors(self, context):
@@ -333,3 +333,14 @@ def update_display_colors(self, context):
 def trigger_display_update(params):
     if params.view_mode == 'view_state':
         params.view_mode = 'view_state'
+
+# https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
+# Auto refresh for custom collection property does not work without tagging a redraw
+def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
+    """ Redraws given windows area of specific type """
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.spaces[0].type == space_type:
+                for region in area.regions:
+                    if region.type == region_type:
+                        region.tag_redraw()
