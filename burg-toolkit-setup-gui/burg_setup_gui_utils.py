@@ -41,6 +41,16 @@ def image_from_numpy(image, name="default"):
     return image
 
 
+def add_material(blender_object):
+    if not "burg_object_material" in bpy.data.materials:
+        print("The material for displaying object colors is missing.")
+    else:
+        object_material = bpy.data.materials["burg_object_material"]
+        # check if we already have appended the materials
+        if len(blender_object.material_slots) < 1:  # if no materials on the object
+            blender_object.data.materials.append(object_material)
+
+
 def get_size(size):
     return BURG_PRINTOUT_SIZES[size]
 
@@ -67,6 +77,7 @@ class SceneManager(object):
         self.object_library = None
         self.scene = None
         self.object_library_file = None
+        self.colormap = plt.get_cmap('tab20')
 
     def same_object_library(self, object_library_file=None):
         return self.object_library_file == object_library_file
@@ -126,6 +137,7 @@ class SceneManager(object):
         if self.scene:
             print("removing current scene")
             self.remove_blender_objects()
+            self.scene.objects.clear()
 
         self.scene = burg.core.Scene(ground_area=ground_area)
 
@@ -144,7 +156,6 @@ class SceneManager(object):
             bpy.context.scene.collection.children.link(
                 bpy.data.collections["objects"])
 
-        colormap = plt.get_cmap('tab20')
         color_idx = 0
         for i, item in enumerate(self.scene.objects):
             o3d_mesh = item.object_type.mesh
@@ -158,20 +169,12 @@ class SceneManager(object):
             obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
             obj.matrix_world = mathutils.Matrix(pose)
             obj["burg_oid"] = obj_id
-            obj["burg_status"] = BurgStatus.OK
-            color_idx = (color_idx + 1) % colormap.N
-            r, g, b = colormap(color_idx)[0:3]
-            obj.color = (r, g, b, 1)
-            obj["burg_color"] = (r, g, b, 1)
+            obj["burg_status"] = BurgStatus
+            color = self.get_color(i)
+            obj.color = color
+            obj["burg_color"] = color
             # check if material for objects is there
-            if not "burg_object_material" in bpy.data.materials:
-                print("The material for displaying object colors is missing.")
-            else:
-                object_material = bpy.data.materials["burg_object_material"]
-                # check if we already have appended the materials
-                if len(obj.material_slots) < 1:  # if no materials on the object
-                    obj.data.materials.append(object_material)
-
+            add_material(obj)
             bpy.data.collections["objects"].objects.link(obj)
             # create connection between scene and blender object
             self.blender_to_burg[obj] = item
@@ -187,6 +190,8 @@ class SceneManager(object):
         collision_objects = self.scene.colliding_instances()
         out_of_bounds_objects = self.scene.out_of_bounds_instances()
         status_ok = True
+        print(collision_objects)
+        print(out_of_bounds_objects)
 
         for o in bpy.data.collections["objects"].objects:
             if o["burg_oid"] in collision_objects:
@@ -197,6 +202,7 @@ class SceneManager(object):
                 status_ok = False
             else:
                 o["burg_status"] = BurgStatus.OK
+        print(f"Status {status_ok}")
         return status_ok
 
     def update_scene_poses(self):
@@ -205,7 +211,7 @@ class SceneManager(object):
         """
 
         for key, value in self.blender_to_burg.items():
-            value.pose[:, :] = key.matrix_world
+            self.blender_to_burg[key].pose[:, :] = key.matrix_world
 
     def update_blender_poses(self):
         """
@@ -220,9 +226,12 @@ class SceneManager(object):
         Removes all blender objects and their meshes   
         """
         for key in self.blender_to_burg.keys():
-            mesh = bpy.data.meshes[key.name]
+            mesh = bpy.data.meshes[key.data.name]
             bpy.data.objects.remove(key, do_unlink=True)
-            bpy.data.meshes.remove(mesh, do_unlink=True)
+            # check if we are the last user for this mesh
+            if mesh.users < 1:
+                print("remove mesh")
+                bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
 
@@ -262,36 +271,39 @@ class SceneManager(object):
             bpy.context.scene.collection.children.link(
                 bpy.data.collections["objects"])
 
-        # get new instance id
-        instance_id = len(bpy.data.collections["objects"].objects)
-
         # create mesh if it is a new instance
         if self.object_library[id].stable_poses:
             stable_pose = self.object_library[id].stable_poses[0][1]
         else:
             stable_pose = np.eye(4)
 
-        print(stable_pose)
         instance = burg.ObjectInstance(
-            self.object_library[id], pose=stable_pose)
+            self.object_library[id], pose=stable_pose.copy())
 
         # TODO: find better unique identifier for meshes
-        mesh_id = f"burg_{id}"
+        mesh_id = f"{id}"
         if bpy.data.meshes.get(mesh_id):
-            print("Mesh is already there")
             blender_mesh = bpy.data.meshes.get(mesh_id)
         else:
-            print(f"Create new Mesh for burg object {id}")
-            o3d_mesh = instance.get_mesh()
+            o3d_mesh = instance.object_type.mesh
             blender_mesh = bpy.data.meshes.new(mesh_id)
             blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
 
-        obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
-        # TODO:  how to retrieve custom color
-        obj.color = (155, 15, 0, 1)
+        # get new instance id
+        instances = len(bpy.data.collections["objects"].objects)
+        obj = bpy.data.objects.new(
+            f"{instances}_{blender_mesh.name}", blender_mesh)
         bpy.data.collections["objects"].objects.link(obj)
         self.blender_to_burg[obj] = instance
-        obj["burg_oid"] = instance_id
+        color = self.get_color(instances)
+        obj["burg_oid"] = instances
+        obj["burg_color"] = color
+        obj["burg_status"] = BurgStatus.OK
+        obj.matrix_world = mathutils.Matrix(stable_pose)
+        obj.color = color
+        add_material(obj)
+
+        self.scene.objects.append(instance)
 
     def lock_transform(self, enable=True):
         """
@@ -318,6 +330,11 @@ class SceneManager(object):
     def is_valid_object_library(self):
         return self.object_library or False
 
+    def get_color(self, id):
+        id = (id + 1) % self.colormap.N
+        r, g, b = self.colormap(id)[0:3]
+        return (r, g, b, 1)
+
 
 def update_display_colors(self, context):
     if "objects" in bpy.data.collections:
@@ -336,6 +353,8 @@ def trigger_display_update(params):
 
 # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
 # Auto refresh for custom collection property does not work without tagging a redraw
+
+
 def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
     """ Redraws given windows area of specific type """
     for window in context.window_manager.windows:
