@@ -96,9 +96,7 @@ class SceneManager(object):
         if self.same_object_library(filepath):
             return
         else:
-            print("New object_library")
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
-            print(self.object_library)
             self.object_library_file = filepath
 
     def random_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, n_instances=1, n_instances_objects=1):
@@ -258,8 +256,6 @@ class SceneManager(object):
 
         :param id: Unique object identifier. 
         """
-
-        print("adding object")
 
         if not self.scene:
             return
