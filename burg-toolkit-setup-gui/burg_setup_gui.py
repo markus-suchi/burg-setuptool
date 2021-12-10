@@ -437,7 +437,6 @@ classes = (
     BURG_PT_object_library,
     BURG_PT_new_scene,
     BURG_PT_scene,
-    BURG_PT_printout,
 
     BURG_OT_update_scene,
     BURG_OT_empty_scene,
@@ -449,6 +448,8 @@ classes = (
 
     BURG_PT_object_selection,
     BURG_PT_object_preview,
+
+    BURG_PT_printout,
 
     BURG_OT_add_object,
 

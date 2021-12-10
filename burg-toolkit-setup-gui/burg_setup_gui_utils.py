@@ -112,6 +112,7 @@ class SceneManager(object):
         self.load_object_library(object_library_file)
 
         if self.scene:
+            #TODO: Remove all stuff like in the empty scene
             print("removing current scene")
 
         # create the new scene
@@ -228,7 +229,6 @@ class SceneManager(object):
             bpy.data.objects.remove(key, do_unlink=True)
             # check if we are the last user for this mesh
             if mesh.users < 1:
-                print("remove mesh")
                 bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
@@ -347,12 +347,11 @@ def trigger_display_update(params):
     if params.view_mode == 'view_state':
         params.view_mode = 'view_state'
 
-# https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
-# Auto refresh for custom collection property does not work without tagging a redraw
-
 
 def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
-    """ Redraws given windows area of specific type """
+   # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
+   # Auto refresh for custom collection property does not work without tagging a redraw
+   """ Redraws given windows area of specific type """
     for window in context.window_manager.windows:
         for area in window.screen.areas:
             if area.spaces[0].type == space_type:
