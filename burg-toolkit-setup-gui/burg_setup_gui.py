@@ -262,11 +262,13 @@ class BURG_OT_add_object(bpy.types.Operator):
 
     def execute(self, context):
         wm = context.window_manager
+        burg_params = context.scene.burg_params
         if wm.burg_objects and wm.burg_object_index >= 0:
             key = wm.burg_objects[wm.burg_object_index]
             mng = utils.SceneManager()
-            mng.add_objects(key.id)
+            mng.add_object(key.id)
             bpy.ops.burg.update_scene()
+            mng.lock_transform(burg_params.lock_transform)
             return {'FINISHED'}
         else:
             return {'CANCELLED'}
@@ -433,6 +435,37 @@ class BURG_PG_params(bpy.types.PropertyGroup):
         name="Printout Margin", default=0.0, min=0.0)
 
 
+# GENERAL OPERATORS
+class delete_override(bpy.types.Operator):
+    # Overriding delete operator
+    # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
+    """delete objects and their derivatives"""
+    bl_idname = "object.delete"
+    bl_label = "Object Delete Operator"
+    use_global : bpy.props.BoolProperty()
+    confirm : bpy.props.BoolProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None 
+
+    def execute(self, context):
+        mng = utils.SceneManager()
+        for obj in context.selected_objects:
+            if mng.is_burg_object(obj):
+                print("Removing Burg Object")
+                mng.remove_object(obj)
+            else:
+                bpy.data.objects.remove(obj)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        if event.type == 'X':
+            return context.window_manager.invoke_confirm(self, event)
+        else:
+            return self.execute(context)
+
 classes = (
     BURG_PT_object_library,
     BURG_PT_new_scene,
@@ -456,6 +489,8 @@ classes = (
     BURG_UL_objects,
 
     BURG_PG_object,
+
+    delete_override,
 )
 
 

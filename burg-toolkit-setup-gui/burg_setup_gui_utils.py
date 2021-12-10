@@ -112,7 +112,7 @@ class SceneManager(object):
         self.load_object_library(object_library_file)
 
         if self.scene:
-            #TODO: Remove all stuff like in the empty scene
+            # TODO: Remove all stuff like in the empty scene
             print("removing current scene")
 
         # create the new scene
@@ -189,19 +189,21 @@ class SceneManager(object):
         collision_objects = self.scene.colliding_instances()
         out_of_bounds_objects = self.scene.out_of_bounds_instances()
         status_ok = True
-        print(collision_objects)
-        print(out_of_bounds_objects)
 
-        for o in bpy.data.collections["objects"].objects:
-            if o["burg_oid"] in collision_objects:
-                o["burg_status"] = BurgStatus.COLLISION
+        # check which objects in our map are in collision or out
+        collision_instances = [self.scene.objects[i] for i in collision_objects]
+        out_of_bounds_instances = [self.scene.objects[i] for i in out_of_bounds_objects]
+
+        for key, value in self.blender_to_burg.items():
+            if value in collision_instances:
+                key["burg_status"] = BurgStatus.COLLISION
                 status_ok = False
-            elif o["burg_oid"] in out_of_bounds_objects:
-                o["burg_status"] = BurgStatus.OUT_OF_BOUNDS
+            elif value in out_of_bounds_instances:
+                key["burg_status"] = BurgStatus.OUT_OF_BOUNDS
                 status_ok = False
             else:
-                o["burg_status"] = BurgStatus.OK
-        print(f"Status {status_ok}")
+                key["burg_status"] = BurgStatus.OK
+
         return status_ok
 
     def update_scene_poses(self):
@@ -233,6 +235,20 @@ class SceneManager(object):
 
         self.blender_to_burg.clear()
 
+    def is_burg_object(self, obj):
+        return self.blender_to_burg.get(obj)
+
+    def remove_object(self, obj):
+        item = self.blender_to_burg.get(obj)
+        if(item):
+            self.blender_to_burg.pop(obj,None)
+            self.scene.objects.remove(item)
+
+            mesh = bpy.data.meshes[obj.data.name]
+            bpy.data.objects.remove(obj, do_unlink=True)
+            if mesh.users < 1:
+                bpy.data.meshes.remove(mesh, do_unlink=True)
+
     def simulate_scene(self, verbose=True):
         """
         Simulates current scene
@@ -250,7 +266,7 @@ class SceneManager(object):
         sim.simulate_scene(self.scene)
         sim.dismiss()  # can also reuse, then the window stays open
 
-    def add_objects(self, id):
+    def add_object(self, id):
         """
         Adds an object with specific id to the scene and blender 
 
@@ -349,9 +365,9 @@ def trigger_display_update(params):
 
 
 def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
-   # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
-   # Auto refresh for custom collection property does not work without tagging a redraw
-   """ Redraws given windows area of specific type """
+    # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
+    # Auto refresh for custom collection property does not work without tagging a redraw
+    """ Redraws given windows area of specific type """
     for window in context.window_manager.windows:
         for area in window.screen.areas:
             if area.spaces[0].type == space_type:
