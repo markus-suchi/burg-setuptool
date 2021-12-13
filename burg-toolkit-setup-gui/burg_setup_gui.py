@@ -109,7 +109,7 @@ class BURG_OT_save_printout(bpy.types.Operator):
 
             burg_params = context.scene.burg_params
             print_size = utils.get_size(burg_params.printout_size)
-            printout = burg.Printout(size=mng.scene.ground_area)
+            printout = burg.printout.Printout(size=mng.scene.ground_area)
             printout.add_scene(mng.scene)
             printout.save_pdf(self.filepath, page_size=print_size,
                               margin_mm=burg_params.printout_margin)
