@@ -289,22 +289,10 @@ class SceneManager(object):
         obj = bpy.data.objects.new(
             f"{hash(instance)}", blender_mesh)
         bpy.data.collections["objects"].objects.link(obj)
-        color = self.get_color(hash(instance))
+        color = self.get_color(self.instance_id)
         obj["burg_oid"] = str(hash(instance))
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
-        # create the list of possible stable poses for this instance
-        cc_pose = len(get_stable_poses(instance))
-        obj.burg_stable_poses = 0
-        if cc_pose:
-            # from https://blender.stackexchange.com/questions/143975/how-to-edit-a-custom-property-in-a-python-script
-            # restrict poses to available poses
-            ui = rna_idprop_ui_prop_get(obj, "burg_stable_poses", create=True)
-            ui['min'] = ui['soft_min'] = 0
-            ui['max'] = ui['soft_max'] = cc_pose-1
-            for area in bpy.context.screen.areas:
-                    area.tag_redraw()
-
         obj.matrix_world = mathutils.Matrix(instance.pose)
         obj.color = color
         add_material(obj)
@@ -312,9 +300,7 @@ class SceneManager(object):
         self.instance_id += 1
 
     def set_to_stable_pose(self, obj):
-        print("set_to_stable_pose")
         if self.has_stable_poses(obj):
-            print("has stable_pose")
             idx = obj.burg_stable_poses
             instance = self.blender_to_burg.get(obj.name)
             
