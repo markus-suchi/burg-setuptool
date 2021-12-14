@@ -1,5 +1,7 @@
 import bpy.utils.previews
 import bpy
+import mathutils
+
 import burg_toolkit as burg
 import burg_setup_gui_utils as utils
 
@@ -18,14 +20,13 @@ class BURG_OT_random_scene(bpy.types.Operator):
 
     def execute(self, context):
         burg_params = context.scene.burg_params
+        mng.remove_blender_objects()
         mng.random_scene(burg_params.object_library_file,
                          n_instances=burg_params.number_objects,
                          ground_area=utils.get_size(
                              burg_params.area_size),
                          n_instances_objects=burg_params.number_instances)
         mng.simulate_scene(verbose=burg_params.view_simulation)
-        mng.remove_blender_objects()
-        mng.load_objects()
         mng.check_status()
         mng.lock_transform(burg_params.lock_transform)
         utils.trigger_display_update(burg_params)
@@ -176,7 +177,7 @@ class BURG_PT_scene(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        obj = context.object
+        obj = context.active_object
         layout.use_property_split = True
         layout.use_property_decorate = False
 
@@ -192,6 +193,11 @@ class BURG_PT_scene(bpy.types.Panel):
         row = layout.row()
         row.prop(burg_params, "view_simulation")
 
+
+        if obj and mng.has_stable_poses(obj):
+                row = layout.row()
+                row.prop(context.active_object, "burg_stable_poses", text="Stable Poses")
+                #row.prop(context.active_object,'["burg_stable_poses"]', text="custom prop")
 
 class BURG_PT_new_scene(bpy.types.Panel):
     bl_label = "Create Scene"
@@ -399,6 +405,21 @@ def update_burg_objects(self, context):
         print(e)
 
 
+def update_stable_poses(self, context):
+    mng.set_to_stable_pose(context.active_object)
+
+def set_stable_poses(self, value):
+    active = bpy.context.active_object
+    if active and mng.is_burg_object(active):
+        n = len(mng.get_stable_poses(active))
+        self["burg_stable_poses"] = (value) % n
+        
+    for area in bpy.context.screen.areas:
+        area.tag_redraw()
+
+def get_stable_poses(self):
+    return self.get("burg_stable_poses",0)
+
 # SCENE PROPERTIES
 def update_lock_transform(self, context):
     mng = utils.SceneManager()
@@ -453,7 +474,6 @@ class delete_override(bpy.types.Operator):
         mng = utils.SceneManager()
         for obj in context.selected_objects:
             if mng.is_burg_object(obj):
-                print("Removing Burg Object")
                 mng.remove_object(obj)
             else:
                 bpy.data.objects.remove(obj)
@@ -509,6 +529,13 @@ def register():
     bpy.types.WindowManager.burg_object_index = bpy.props.IntProperty(
         name="Index for Object List")
 
+    bpy.types.Object.burg_stable_poses = bpy.props.IntProperty(name="Stable Poses", 
+                                                               set = set_stable_poses,
+                                                               get = get_stable_poses,
+                                                               update = update_stable_poses
+                                                               )
+
+
 
 def unregister():
     global burg_object_previews
@@ -522,7 +549,7 @@ def unregister():
     del bpy.types.Scene.burg_params
     del bpy.types.WindowManager.burg_objects
     del bpy.types.WindowManager.burg_object_index
-
+    del bpy.types.Object.burg_stable_poses
 
 if __name__ == "__main__":
     register()

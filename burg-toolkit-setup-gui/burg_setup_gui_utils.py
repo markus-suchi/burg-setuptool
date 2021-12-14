@@ -1,4 +1,6 @@
 import bpy
+from rna_prop_ui import rna_idprop_ui_prop_get
+
 from enum import IntEnum
 import os
 import numpy as np
@@ -78,6 +80,7 @@ class SceneManager(object):
         self.scene = None
         self.object_library_file = None
         self.colormap = plt.get_cmap('tab20')
+        self.instance_id = 0
 
     def same_object_library(self, object_library_file=None):
         return self.object_library_file == object_library_file
@@ -111,17 +114,16 @@ class SceneManager(object):
 
         self.load_object_library(object_library_file)
 
-        if self.scene:
-            # TODO: Remove all stuff like in the empty scene
-            print("removing current scene")
-
-        # create the new scene
         self.scene = burg.sampling.sample_scene(
             object_library=self.object_library,
             ground_area=ground_area,
             instances_per_scene=n_instances,
             instances_per_object=n_instances_objects
         )
+
+        for item in self.scene.objects:
+            self.add_burg_instance_to_blender(item)
+
 
     def empty_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3):
         """
@@ -139,44 +141,9 @@ class SceneManager(object):
             self.scene.objects.clear()
 
         self.scene = burg.core.Scene(ground_area=ground_area)
+        #reset instance id
+        self.instance_id = 0
 
-    def load_objects(self):
-        """
-        Loads objects from current scene into blender.
-        """
-
-        if not self.scene:
-            return
-
-        if "objects" not in bpy.data.collections:
-            # deselect all
-            bpy.ops.object.select_all(action='DESELECT')
-            obj_collection = bpy.ops.collection.create(name="objects")
-            bpy.context.scene.collection.children.link(
-                bpy.data.collections["objects"])
-
-        color_idx = 0
-        for i, item in enumerate(self.scene.objects):
-            o3d_mesh = item.object_type.mesh
-            pose = item.pose
-
-            # TODO: Here we still make an name out of the type and not the instance
-            blender_mesh = bpy.data.meshes.new(
-                str(i) + '_' + item.object_type.identifier)
-            blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
-            obj_id = i
-            obj = bpy.data.objects.new(blender_mesh.name, blender_mesh)
-            obj.matrix_world = mathutils.Matrix(pose)
-            obj["burg_oid"] = obj_id
-            obj["burg_status"] = BurgStatus
-            color = self.get_color(i)
-            obj.color = color
-            obj["burg_color"] = color
-            # check if material for objects is there
-            add_material(obj)
-            bpy.data.collections["objects"].objects.link(obj)
-            # create connection between scene and blender object
-            self.blender_to_burg[obj] = item
 
     def check_status(self):
         """
@@ -195,14 +162,15 @@ class SceneManager(object):
         out_of_bounds_instances = [self.scene.objects[i] for i in out_of_bounds_objects]
 
         for key, value in self.blender_to_burg.items():
+            real_object = bpy.data.objects[key]
             if value in collision_instances:
-                key["burg_status"] = BurgStatus.COLLISION
+                real_object["burg_status"] = BurgStatus.COLLISION
                 status_ok = False
             elif value in out_of_bounds_instances:
-                key["burg_status"] = BurgStatus.OUT_OF_BOUNDS
+                real_object["burg_status"] = BurgStatus.OUT_OF_BOUNDS
                 status_ok = False
             else:
-                key["burg_status"] = BurgStatus.OK
+                real_object["burg_status"] = BurgStatus.OK
 
         return status_ok
 
@@ -212,7 +180,8 @@ class SceneManager(object):
         """
 
         for key, value in self.blender_to_burg.items():
-            self.blender_to_burg[key].pose[:, :] = key.matrix_world
+            real_object = bpy.data.objects[key]
+            self.blender_to_burg[key].pose[:, :] = real_object.matrix_world
 
     def update_blender_poses(self):
         """
@@ -220,32 +189,37 @@ class SceneManager(object):
         """
 
         for key, value in self.blender_to_burg.items():
-            key.matrix_world = mathutils.Matrix(value.pose)
+            real_object = bpy.data.objects[key]
+            real_object.matrix_world = mathutils.Matrix(value.pose)
 
     def remove_blender_objects(self):
         """
         Removes all blender objects and their meshes   
         """
+
         for key in self.blender_to_burg.keys():
-            mesh = bpy.data.meshes[key.data.name]
-            bpy.data.objects.remove(key, do_unlink=True)
+            obj = bpy.data.objects[key]
+            mesh = bpy.data.meshes[obj.data.name]
+            bpy.data.objects.remove(obj, do_unlink=True)
             # check if we are the last user for this mesh
             if mesh.users < 1:
                 bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
+        self.instance_id = 0
 
     def is_burg_object(self, obj):
-        return self.blender_to_burg.get(obj)
+        return obj.name in self.blender_to_burg.keys()
 
     def remove_object(self, obj):
-        item = self.blender_to_burg.get(obj)
+        item = self.blender_to_burg.get(obj.name)
         if(item):
-            self.blender_to_burg.pop(obj,None)
+            self.blender_to_burg.pop(obj.name,None)
             self.scene.objects.remove(item)
-
-            mesh = bpy.data.meshes[obj.data.name]
-            bpy.data.objects.remove(obj, do_unlink=True)
+            
+            real_object = bpy.data.objects[obj.name]
+            mesh = bpy.data.meshes[real_object.data.name]
+            bpy.data.objects.remove(real_object, do_unlink=True)
             if mesh.users < 1:
                 bpy.data.meshes.remove(mesh, do_unlink=True)
 
@@ -270,20 +244,13 @@ class SceneManager(object):
         """
         Adds an object with specific id to the scene and blender 
 
-        :param id: Unique object identifier. 
+        :param id: Unique burg ObjectType identifier. 
         """
 
         if not self.scene:
             return
 
-        if "objects" not in bpy.data.collections:
-            # deselect all
-            bpy.ops.object.select_all(action='DESELECT')
-            obj_collection = bpy.ops.collection.create(name="objects")
-            bpy.context.scene.collection.children.link(
-                bpy.data.collections["objects"])
-
-        # create mesh if it is a new instance
+         # retrieve first stable pose as default
         if self.object_library[id].stable_poses:
             stable_pose = self.object_library[id].stable_poses[0][1]
         else:
@@ -292,8 +259,26 @@ class SceneManager(object):
         instance = burg.ObjectInstance(
             self.object_library[id], pose=stable_pose.copy())
 
-        # TODO: find better unique identifier for meshes
-        mesh_id = f"{id}"
+        self.add_burg_instance_to_blender(instance)
+        self.scene.objects.append(instance)
+
+
+    def add_burg_instance_to_blender(self, instance):
+        """
+        Adds all relevant blender objects for a specific burg ObjectInstance 
+
+        :param instance: A burg ObjectInstance 
+        """
+
+        if "objects" not in bpy.data.collections:
+            # deselect all
+            bpy.ops.object.select_all(action='DESELECT')
+            obj_collection = bpy.ops.collection.create(name="objects")
+            bpy.context.scene.collection.children.link(
+                bpy.data.collections["objects"])
+
+
+        mesh_id = f"{instance.object_type.identifier}"
         if bpy.data.meshes.get(mesh_id):
             blender_mesh = bpy.data.meshes.get(mesh_id)
         else:
@@ -301,21 +286,47 @@ class SceneManager(object):
             blender_mesh = bpy.data.meshes.new(mesh_id)
             blender_mesh.from_pydata(o3d_mesh.vertices, [], o3d_mesh.triangles)
 
-        # get new instance id
-        instances = len(bpy.data.collections["objects"].objects)
         obj = bpy.data.objects.new(
-            f"{instances}_{blender_mesh.name}", blender_mesh)
+            f"{hash(instance)}", blender_mesh)
         bpy.data.collections["objects"].objects.link(obj)
-        self.blender_to_burg[obj] = instance
-        color = self.get_color(instances)
-        obj["burg_oid"] = instances
+        color = self.get_color(hash(instance))
+        obj["burg_oid"] = str(hash(instance))
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
-        obj.matrix_world = mathutils.Matrix(stable_pose)
+        # create the list of possible stable poses for this instance
+        cc_pose = len(get_stable_poses(instance))
+        obj.burg_stable_poses = 0
+        if cc_pose:
+            # from https://blender.stackexchange.com/questions/143975/how-to-edit-a-custom-property-in-a-python-script
+            # restrict poses to available poses
+            ui = rna_idprop_ui_prop_get(obj, "burg_stable_poses", create=True)
+            ui['min'] = ui['soft_min'] = 0
+            ui['max'] = ui['soft_max'] = cc_pose-1
+            for area in bpy.context.screen.areas:
+                    area.tag_redraw()
+
+        obj.matrix_world = mathutils.Matrix(instance.pose)
         obj.color = color
         add_material(obj)
+        self.blender_to_burg[obj.name] = instance
+        self.instance_id += 1
 
-        self.scene.objects.append(instance)
+    def set_to_stable_pose(self, obj):
+        print("set_to_stable_pose")
+        if self.has_stable_poses(obj):
+            print("has stable_pose")
+            idx = obj.burg_stable_poses
+            instance = self.blender_to_burg.get(obj.name)
+            
+            if instance:
+                new_pose = mathutils.Matrix(instance.object_type.stable_poses[idx][1].copy())
+                new_pose[0][3] = obj.matrix_world[0][3]
+                new_pose[1][3] = obj.matrix_world[1][3]
+                obj.matrix_world = new_pose
+                for area in bpy.context.screen.areas:
+                        area.tag_redraw()
+
+
 
     def lock_transform(self, enable=True):
         """
@@ -327,14 +338,15 @@ class SceneManager(object):
         """
 
         for key in self.blender_to_burg.keys():
+            obj = bpy.data.objects[key]
             if enable:
-                key.lock_location[2] = True
-                key.lock_rotation[0] = True
-                key.lock_rotation[1] = True
+                obj.lock_location[2] = True
+                obj.lock_rotation[0] = True
+                obj.lock_rotation[1] = True
             else:
-                key.lock_location[2] = False
-                key.lock_rotation[0] = False
-                key.lock_rotation[1] = False
+                obj.lock_location[2] = False
+                obj.lock_rotation[0] = False
+                obj.lock_rotation[1] = False
 
     def is_valid_scene(self):
         return self.scene or False
@@ -342,10 +354,43 @@ class SceneManager(object):
     def is_valid_object_library(self):
         return self.object_library or False
 
+    def has_stable_poses(self, obj):
+        instance = self.blender_to_burg.get(obj.name)
+        if instance:
+            return bool(instance.object_type.stable_poses)
+        else:
+            return False
+    
+    def get_stable_poses(self, obj):
+        instance = self.blender_to_burg.get(obj.name)
+        if instance:
+            return instance.object_type.stable_poses
+        else:
+            return None 
+
+
     def get_color(self, id):
-        id = (id + 1) % self.colormap.N
+        id = (id) % self.colormap.N
         r, g, b = self.colormap(id)[0:3]
         return (r, g, b, 1)
+
+    def get_burg_instance(self, obj):
+        instance = self.blender_to_burg.get(obj.name)
+        if instance:
+            return instance
+        else:
+            return None
+
+    
+def get_stable_poses(instance):
+        stable_poses = []
+        for pose in instance.object_type.stable_poses:
+            new_pose = pose[1].copy()
+            new_pose[0,3]=0
+            new_pose[1,3]=0
+            stable_poses.append(mathutils.Matrix(new_pose))
+
+        return stable_poses
 
 
 def update_display_colors(self, context):
