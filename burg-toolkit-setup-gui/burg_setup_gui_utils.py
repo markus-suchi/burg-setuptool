@@ -1,11 +1,12 @@
 import bpy
-from rna_prop_ui import rna_idprop_ui_prop_get
+import addon_utils
 
 from enum import IntEnum
 import os
 import numpy as np
 import mathutils
 import matplotlib.pyplot as plt
+from PIL import Image
 
 import burg_toolkit as burg
 
@@ -25,22 +26,48 @@ BURG_PRINTOUT_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
                        "SIZE_A4": burg.constants.SIZE_A4}
 
 
+def get_resources_folder():
+    for mod in addon_utils.modules():
+        if mod.bl_info['name'] == "BURG toolkit - Setup GUI":
+            file = mod.__file__
+            return os.path.join(os.path.dirname(file), 'resources')
+        else:
+            pass
+
+
 def image_from_numpy(image, name="default"):
     """
-    Converts numpy image to blender image
+     Converts numpy image to blender image
 
-    :param: image as numpy array
-    :param: name of the image in blender
-    """
+     :param: image as numpy array
+     :param: name of the image in blender
+     """
+
     h, w = np.shape(layout_img)
     byte_to_normalized = 1.0 / 255.0
     pil_image = Image.fromarray(layout_img)
     pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
     image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
     image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),
-                       dtype=np.float32) * byte_to_normalized).ravel()
+                                  dtype=np.float32) * byte_to_normalized).ravel()
     image.file_format = 'PNG'
     return image
+
+
+def convert_numpy_image(image):
+    """
+    Converts numpy image to blender image
+
+    :param: image as numpy array
+    :return blender ready pixel array
+    """
+
+    h, w = np.shape(image)
+    byte_to_normalized = 1.0 / 255.0
+    pil_image = Image.fromarray(image)
+    pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
+    return (np.asarray(pil_image.convert('RGBA'),
+                       dtype=np.float32) * byte_to_normalized).ravel()
 
 
 def add_material(blender_object):
@@ -80,10 +107,14 @@ class SceneManager(object):
         self.scene = None
         self.object_library_file = None
         self.colormap = plt.get_cmap('tab20')
-        self.instance_id = 0
+        self.color_id = 0
 
     def same_object_library(self, object_library_file=None):
         return self.object_library_file == object_library_file
+
+    def set_area_size(self, size):
+        print(f"Set size to {BURG_PRINTOUT_SIZES[size]}")
+        self.scene.ground_area = BURG_PRINTOUT_SIZES[size]
 
     def load_object_library(self, filepath):
         """
@@ -94,7 +125,7 @@ class SceneManager(object):
 
         if not filepath or not os.path.isfile(filepath):
             raise ValueError(
-                "Object Library File {object_lib_file} does not exist.")
+                f"Object Library File {object_lib_file} does not exist.")
 
         if self.same_object_library(filepath):
             return
@@ -124,7 +155,6 @@ class SceneManager(object):
         for item in self.scene.objects:
             self.add_burg_instance_to_blender(item)
 
-
     def empty_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3):
         """
         Creates an empty scene.
@@ -141,9 +171,45 @@ class SceneManager(object):
             self.scene.objects.clear()
 
         self.scene = burg.core.Scene(ground_area=ground_area)
-        #reset instance id
-        self.instance_id = 0
+        # reset instance id
+        self.color_id = 0
 
+    def load_scene(self, scene_file=None):
+        """
+        Loads a scene from file.
+
+        :param scene_file: Path to a scene yaml file
+        """
+
+        if not os.path.isfile(scene_file):
+            print(f"The scene file {scene_file} does not exist.")
+        else:
+            try:
+                # TODO: hwo to handle printout
+                scene, library, printout = burg.Scene.from_yaml(scene_file)
+                if scene and library:
+                    if self.scene:
+                        self.remove_blender_objects()
+                        self.scene.objects.clear()
+
+                    self.scene = scene
+                    self.object_library = library
+                    self.object_library_file = library.filename
+                    for item in self.scene.objects:
+                        self.add_burg_instance_to_blender(item)
+            except Exception as e:
+                print(f"Could not open burg scene: {scene_file}")
+                print(e)
+
+    def save_scene(self, scene_file=None):
+        if not scene_file:
+            print(f"Empty scene_file.")
+        else:
+            try:
+                self.scene.to_yaml(scene_file, self.object_library)
+            except Exception as e:
+                print(f"Could not save burg scene: {scene_file}")
+                print(e)
 
     def check_status(self):
         """
@@ -158,8 +224,10 @@ class SceneManager(object):
         status_ok = True
 
         # check which objects in our map are in collision or out
-        collision_instances = [self.scene.objects[i] for i in collision_objects]
-        out_of_bounds_instances = [self.scene.objects[i] for i in out_of_bounds_objects]
+        collision_instances = [self.scene.objects[i]
+                               for i in collision_objects]
+        out_of_bounds_instances = [self.scene.objects[i]
+                                   for i in out_of_bounds_objects]
 
         for key, value in self.blender_to_burg.items():
             real_object = bpy.data.objects[key]
@@ -206,7 +274,7 @@ class SceneManager(object):
                 bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
-        self.instance_id = 0
+        self.color_id = 0
 
     def is_burg_object(self, obj):
         return obj.name in self.blender_to_burg.keys()
@@ -214,9 +282,9 @@ class SceneManager(object):
     def remove_object(self, obj):
         item = self.blender_to_burg.get(obj.name)
         if(item):
-            self.blender_to_burg.pop(obj.name,None)
+            self.blender_to_burg.pop(obj.name, None)
             self.scene.objects.remove(item)
-            
+
             real_object = bpy.data.objects[obj.name]
             mesh = bpy.data.meshes[real_object.data.name]
             bpy.data.objects.remove(real_object, do_unlink=True)
@@ -262,7 +330,6 @@ class SceneManager(object):
         self.add_burg_instance_to_blender(instance)
         self.scene.objects.append(instance)
 
-
     def add_burg_instance_to_blender(self, instance):
         """
         Adds all relevant blender objects for a specific burg ObjectInstance 
@@ -277,7 +344,6 @@ class SceneManager(object):
             bpy.context.scene.collection.children.link(
                 bpy.data.collections["objects"])
 
-
         mesh_id = f"{instance.object_type.identifier}"
         if bpy.data.meshes.get(mesh_id):
             blender_mesh = bpy.data.meshes.get(mesh_id)
@@ -289,7 +355,7 @@ class SceneManager(object):
         obj = bpy.data.objects.new(
             f"{hash(instance)}", blender_mesh)
         bpy.data.collections["objects"].objects.link(obj)
-        color = self.get_color(self.instance_id)
+        color = self.get_color(self.color_id)
         obj["burg_oid"] = str(hash(instance))
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
@@ -297,22 +363,21 @@ class SceneManager(object):
         obj.color = color
         add_material(obj)
         self.blender_to_burg[obj.name] = instance
-        self.instance_id += 1
+        self.color_id += 1
 
     def set_to_stable_pose(self, obj):
         if self.has_stable_poses(obj):
             idx = obj.burg_stable_poses
             instance = self.blender_to_burg.get(obj.name)
-            
+
             if instance:
-                new_pose = mathutils.Matrix(instance.object_type.stable_poses[idx][1].copy())
+                new_pose = mathutils.Matrix(
+                    instance.object_type.stable_poses[idx][1].copy())
                 new_pose[0][3] = obj.matrix_world[0][3]
                 new_pose[1][3] = obj.matrix_world[1][3]
                 obj.matrix_world = new_pose
                 for area in bpy.context.screen.areas:
-                        area.tag_redraw()
-
-
+                    area.tag_redraw()
 
     def lock_transform(self, enable=True):
         """
@@ -346,14 +411,13 @@ class SceneManager(object):
             return bool(instance.object_type.stable_poses)
         else:
             return False
-    
+
     def get_stable_poses(self, obj):
         instance = self.blender_to_burg.get(obj.name)
         if instance:
             return instance.object_type.stable_poses
         else:
-            return None 
-
+            return None
 
     def get_color(self, id):
         id = (id) % self.colormap.N
@@ -367,16 +431,16 @@ class SceneManager(object):
         else:
             return None
 
-    
-def get_stable_poses(instance):
-        stable_poses = []
-        for pose in instance.object_type.stable_poses:
-            new_pose = pose[1].copy()
-            new_pose[0,3]=0
-            new_pose[1,3]=0
-            stable_poses.append(mathutils.Matrix(new_pose))
 
-        return stable_poses
+def get_stable_poses(instance):
+    stable_poses = []
+    for pose in instance.object_type.stable_poses:
+        new_pose = pose[1].copy()
+        new_pose[0, 3] = 0
+        new_pose[1, 3] = 0
+        stable_poses.append(mathutils.Matrix(new_pose))
+
+    return stable_poses
 
 
 def update_display_colors(self, context):
