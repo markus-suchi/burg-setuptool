@@ -14,7 +14,7 @@ mng = utils.SceneManager()
 
 # SCENE OPERATORS
 class BURG_OT_random_scene(bpy.types.Operator):
-    """ Creates a raindom scene """
+    """ Creates a random scene """
 
     bl_idname = "burg.random_scene"
     bl_label = "Create Random Scene"
@@ -165,7 +165,7 @@ class BURG_OT_save_scene(bpy.types.Operator):
 
 
 class BURG_OT_load_scene(bpy.types.Operator):
-    """ Loading scene setup to file """
+    """ Loading scene setup from file """
 
     bl_idname = "burg.load_scene"
     bl_label = "Load Scene"
@@ -311,7 +311,7 @@ class BURG_PT_printout(bpy.types.Panel):
 
     @classmethod
     def poll(self, context):
-        return (context is not None and utils.SceneManager().is_valid_scene())
+        return (context is not None and mng.is_valid_scene())
 
     def draw(self, context):
         layout = self.layout
@@ -345,7 +345,6 @@ class BURG_OT_add_object(bpy.types.Operator):
         burg_params = context.scene.burg_params
         if wm.burg_objects and wm.burg_object_index >= 0:
             key = wm.burg_objects[wm.burg_object_index]
-            mng = utils.SceneManager()
             mng.add_object(key.id)
             bpy.ops.burg.update_scene()
             mng.lock_transform(burg_params.lock_transform)
@@ -477,8 +476,7 @@ def update_burg_objects(self, context):
                 burg_object_previews.load(
                     item.id, os.path.join(resources_folder, 'missing_image.png'), 'IMAGE')
     except Exception as e:
-        print(
-            f"An error occurred creating previews.")
+        print(f"An error occurred creating previews.")
         print(e)
 
 
@@ -525,7 +523,7 @@ def update_area_size(self, context):
         if mng.check_status():
             mng.simulate_scene(verbose=burg_params.view_simulation)
             mng.check_status()
-    
+
     utils.trigger_display_update(burg_params)
 
 
@@ -543,17 +541,17 @@ class BURG_PG_params(bpy.types.PropertyGroup):
     view_mode: bpy.props.EnumProperty(
         items=[('view_color', 'Color', 'Object Color', '', 0),
                ('view_state', 'State', 'Object State', '', 1)],
-        default=0, update=utils.update_display_colors)
+        default=1, update=utils.update_display_colors)
     printout_size: bpy.props.EnumProperty(
         items=[('SIZE_A2', 'A2', 'Printout Size A2', '', 0),
                ('SIZE_A3', 'A3', 'Printout Size A3', '', 1),
                ('SIZE_A4', 'A4', 'Printout Size A4', '', 2)],
-        default=1)
+        default=0)
     area_size: bpy.props.EnumProperty(
         items=[('SIZE_A2', 'A2', 'Area Size A2', '', 0),
                ('SIZE_A3', 'A3', 'Area Size A3', '', 1),
                ('SIZE_A4', 'A4', 'Area Size A4', '', 2)],
-        default=1,
+        default=0,
         update=update_area_size)
     printout_margin: bpy.props.FloatProperty(
         name="Printout Margin", default=0.0, min=0.0)
