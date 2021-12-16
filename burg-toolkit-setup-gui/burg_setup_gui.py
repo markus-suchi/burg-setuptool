@@ -59,6 +59,7 @@ class BURG_OT_update_scene(bpy.types.Operator):
     bl_label = "Update Scene"
 
     def execute(self, context):
+        mng.synchronize()
         mng.update_scene_poses()
         burg_params = bpy.context.scene.burg_params
         # mng.simulate_scene(verbose=True)
@@ -84,7 +85,8 @@ class BURG_OT_load_object_library(bpy.types.Operator):
             # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
             burg_params.object_library_file = self.filepath
-            mng.empty_scene(burg_params.object_library_file)
+            mng.empty_scene(burg_params.object_library_file, 
+                            ground_area = utils.get_size(burg_params.area_size))
             update_burg_objects(self, context)
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             return {'FINISHED'}
@@ -179,8 +181,11 @@ class BURG_OT_load_scene(bpy.types.Operator):
             burg_params = context.scene.burg_params
             burg_params.object_library_file = mng.object_library_file
             update_burg_objects(self, context)
-            utils.update_display_colors(self, context)
+            utils.update_display_colors()
             mng.lock_transform(burg_params.lock_transform)
+            
+            burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area] 
+
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             return {'FINISHED'}
         except Exception as e:
@@ -346,7 +351,6 @@ class BURG_OT_add_object(bpy.types.Operator):
         if wm.burg_objects and wm.burg_object_index >= 0:
             key = wm.burg_objects[wm.burg_object_index]
             obj = mng.add_object(key.id)
-            print(f"Object {obj}")
             utils.set_active_and_select(obj)
             bpy.ops.burg.update_scene()
             mng.lock_transform(burg_params.lock_transform)
@@ -518,7 +522,9 @@ def update_area_size(self, context):
     np_image = burg.printout.Printout(size).get_image()
     h, w = np_image.shape
     img.scale(w, h)
+    
     img.pixels[:] = utils.convert_numpy_image(np_image)
+    img.update()
 
     if mng.is_valid_scene():
         mng.set_area_size(burg_params.area_size)
@@ -528,6 +534,8 @@ def update_area_size(self, context):
 
     utils.trigger_display_update(burg_params)
 
+def update_display_colors(self, context):
+    utils.update_display_colors()
 
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
@@ -543,7 +551,7 @@ class BURG_PG_params(bpy.types.PropertyGroup):
     view_mode: bpy.props.EnumProperty(
         items=[('view_color', 'Color', 'Object Color', '', 0),
                ('view_state', 'State', 'Object State', '', 1)],
-        default=1, update=utils.update_display_colors)
+        default=1, update=update_display_colors)
     printout_size: bpy.props.EnumProperty(
         items=[('SIZE_A2', 'A2', 'Printout Size A2', '', 0),
                ('SIZE_A3', 'A3', 'Printout Size A3', '', 1),

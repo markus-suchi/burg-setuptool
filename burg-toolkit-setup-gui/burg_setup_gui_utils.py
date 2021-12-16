@@ -21,9 +21,13 @@ BURG_STATUS_COLORS = {BurgStatus.OK: (0, 1, 0),
                       BurgStatus.COLLISION: (1, 0, 0),
                       BurgStatus.OUT_OF_BOUNDS: (1, 0, 1)}
 
-BURG_PRINTOUT_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
+BLENDER_TO_BURG_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
                        "SIZE_A3": burg.constants.SIZE_A3,
                        "SIZE_A4": burg.constants.SIZE_A4}
+
+BURG_TO_BLENDER_SIZES = {burg.constants.SIZE_A2: "SIZE_A2",
+                         burg.constants.SIZE_A3: "SIZE_A3",
+                         burg.constants.SIZE_A4: "SIZE_A4"}
 
 
 def get_resources_folder():
@@ -33,25 +37,6 @@ def get_resources_folder():
             return os.path.join(os.path.dirname(file), 'resources')
         else:
             pass
-
-
-def image_from_numpy(image, name="default"):
-    """
-     Converts numpy image to blender image
-
-     :param: image as numpy array
-     :param: name of the image in blender
-     """
-
-    h, w = np.shape(layout_img)
-    byte_to_normalized = 1.0 / 255.0
-    pil_image = Image.fromarray(layout_img)
-    pil_image = pil_image.transpose(Image.FLIP_TOP_BOTTOM)
-    image = bpy.data.images.new("printout", alpha=False, width=w, height=h)
-    image.pixels[:] = (np.asarray(pil_image.convert('RGBA'),
-                                  dtype=np.float32) * byte_to_normalized).ravel()
-    image.file_format = 'PNG'
-    return image
 
 
 def convert_numpy_image(image):
@@ -81,7 +66,7 @@ def add_material(blender_object):
 
 
 def get_size(size):
-    return BURG_PRINTOUT_SIZES[size]
+    return BLENDER_TO_BURG_SIZES[size]
 
 
 def singleton(cls):
@@ -113,8 +98,8 @@ class SceneManager(object):
         return self.object_library_file == object_library_file
 
     def set_area_size(self, size):
-        print(f"Set size to {BURG_PRINTOUT_SIZES[size]}")
-        self.scene.ground_area = BURG_PRINTOUT_SIZES[size]
+        print(f"Set size to {get_size(size)}")
+        self.scene.ground_area = get_size(size)
 
     def load_object_library(self, filepath):
         """
@@ -216,7 +201,7 @@ class SceneManager(object):
         Checks the status of all object in the scene using simulation.
         """
 
-        if not self.scene or "objects" not in bpy.data.collections:
+        if not self.scene:
             return
 
         collision_objects = self.scene.colliding_instances()
@@ -337,13 +322,6 @@ class SceneManager(object):
         :param instance: A burg ObjectInstance 
         """
 
-        if "objects" not in bpy.data.collections:
-            # deselect all
-            bpy.ops.object.select_all(action='DESELECT')
-            obj_collection = bpy.ops.collection.create(name="objects")
-            bpy.context.scene.collection.children.link(
-                bpy.data.collections["objects"])
-
         mesh_id = f"{instance.object_type.identifier}"
         if bpy.data.meshes.get(mesh_id):
             blender_mesh = bpy.data.meshes.get(mesh_id)
@@ -354,16 +332,16 @@ class SceneManager(object):
 
         obj = bpy.data.objects.new(
             f"{hash(instance)}", blender_mesh)
-        bpy.data.collections["objects"].objects.link(obj)
+        self.color_id += 1
         color = self.get_color(self.color_id)
-        obj["burg_oid"] = str(hash(instance))
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
+        obj["burg_object_type"] = instance.object_type.identifier
         obj.matrix_world = mathutils.Matrix(instance.pose)
         obj.color = color
         add_material(obj)
         self.blender_to_burg[obj.name] = instance
-        self.color_id += 1
+        bpy.context.collection.objects.link(obj)
         return obj
 
     def set_to_stable_pose(self, obj):
@@ -432,6 +410,46 @@ class SceneManager(object):
         else:
             return None
 
+    def synchronize(self):
+        #only synchronize if there is a scene
+        if not self.scene:
+            print("Tried to synch an empty scene.")
+            return
+
+        key = set(self.blender_to_burg.keys())
+        active = {obj.name 
+                     for obj in bpy.data.objects if obj.get("burg_object_type")}
+        delete = key - active     
+        add = active - key
+
+        for item in delete:
+            instance = self.blender_to_burg.pop(item, None) 
+            if instance:
+                self.scene.objects.remove(instance)
+
+        for item in add:
+            # get current pose from blender object
+            obj = bpy.data.objects[item]
+            blender_pose = np.eye(4)
+            blender_pose[:,:] = obj.matrix_world
+            # create the instance and set to new pose
+            instance = burg.ObjectInstance(self.object_library[obj["burg_object_type"]],
+                                           pose = blender_pose.copy())
+            self.scene.objects.append(instance)
+            self.blender_to_burg[item] = instance
+            # needs a new color
+            self.color_id += 1
+            obj["burg_color"] = self.get_color(self.color_id)
+
+        update_display_colors()
+        #TODO: need to also update area size and printout?
+        # It is important that during loading of a scene area_size property gets updated
+        size = get_size(bpy.context.scene.burg_params.area_size)
+        if not self.scene.ground_area == size:
+            # either change here or trigger an update
+            print("different sizes")
+            self.scene.ground_area = size
+            
 
 def get_stable_poses(instance):
     stable_poses = []
@@ -443,17 +461,15 @@ def get_stable_poses(instance):
 
     return stable_poses
 
-
-def update_display_colors(self, context):
-    if "objects" in bpy.data.collections:
-        burg_params = context.scene.burg_params
-        if burg_params.view_mode == 'view_color':
-            for o in bpy.data.collections["objects"].objects:
-                o.color = o["burg_color"]
-        elif burg_params.view_mode == 'view_state':
-            for o in bpy.data.collections["objects"].objects:
-                o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
-
+def update_display_colors():
+    burg_params = bpy.context.scene.burg_params
+    burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
+    if burg_params.view_mode == 'view_color':
+        for o in burg_objects:
+            o.color = o["burg_color"]
+    elif burg_params.view_mode == 'view_state':
+        for o in burg_objects:
+            o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
 
 def trigger_display_update(params):
     if params.view_mode == 'view_state':
