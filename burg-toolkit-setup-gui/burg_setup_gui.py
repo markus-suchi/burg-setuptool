@@ -345,7 +345,9 @@ class BURG_OT_add_object(bpy.types.Operator):
         burg_params = context.scene.burg_params
         if wm.burg_objects and wm.burg_object_index >= 0:
             key = wm.burg_objects[wm.burg_object_index]
-            mng.add_object(key.id)
+            obj = mng.add_object(key.id)
+            print(f"Object {obj}")
+            utils.set_active_and_select(obj)
             bpy.ops.burg.update_scene()
             mng.lock_transform(burg_params.lock_transform)
             return {'FINISHED'}

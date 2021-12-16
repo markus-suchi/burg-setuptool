@@ -327,8 +327,8 @@ class SceneManager(object):
         instance = burg.ObjectInstance(
             self.object_library[id], pose=stable_pose.copy())
 
-        self.add_burg_instance_to_blender(instance)
         self.scene.objects.append(instance)
+        return self.add_burg_instance_to_blender(instance)
 
     def add_burg_instance_to_blender(self, instance):
         """
@@ -364,6 +364,7 @@ class SceneManager(object):
         add_material(obj)
         self.blender_to_burg[obj.name] = instance
         self.color_id += 1
+        return obj
 
     def set_to_stable_pose(self, obj):
         if self.has_stable_poses(obj):
@@ -469,3 +470,9 @@ def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
                 for region in area.regions:
                     if region.type == region_type:
                         region.tag_redraw()
+
+def set_active_and_select(obj):
+    bpy.context.view_layer.objects.active=obj
+    for selected in bpy.context.selected_objects:
+        selected.select_set(False)
+    obj.select_set(True)
