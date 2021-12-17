@@ -112,11 +112,14 @@ class SceneManager(object):
             raise ValueError(
                 f"Object Library File {object_lib_file} does not exist.")
 
-        if self.same_object_library(filepath):
-            return
-        else:
+        if not self.same_object_library(filepath):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
             self.object_library_file = filepath
+
+        #Loading a new object_library invalidates the scene and mapping
+        self.blender_to_burg.clear()
+        self.scene = None
+
 
     def random_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, n_instances=1, n_instances_objects=1):
         """
@@ -412,43 +415,47 @@ class SceneManager(object):
 
     def synchronize(self):
         #only synchronize if there is a scene
-        if not self.scene:
-            print("Tried to synch an empty scene.")
-            return
+        try:
+            print("Manager synchronize")
+            if not self.scene:
+                print("Tried to synch an empty scene.")
+                return
 
-        key = set(self.blender_to_burg.keys())
-        active = {obj.name 
-                     for obj in bpy.data.objects if obj.get("burg_object_type")}
-        delete = key - active     
-        add = active - key
+            key = set(self.blender_to_burg.keys())
+            active = {obj.name 
+                         for obj in bpy.data.objects if obj.get("burg_object_type")}
+            delete = key - active     
+            add = active - key
 
-        for item in delete:
-            instance = self.blender_to_burg.pop(item, None) 
-            if instance:
-                self.scene.objects.remove(instance)
+            for item in delete:
+                instance = self.blender_to_burg.pop(item, None) 
+                if instance:
+                    self.scene.objects.remove(instance)
 
-        for item in add:
-            # get current pose from blender object
-            obj = bpy.data.objects[item]
-            blender_pose = np.eye(4)
-            blender_pose[:,:] = obj.matrix_world
-            # create the instance and set to new pose
-            instance = burg.ObjectInstance(self.object_library[obj["burg_object_type"]],
-                                           pose = blender_pose.copy())
-            self.scene.objects.append(instance)
-            self.blender_to_burg[item] = instance
-            # needs a new color
-            self.color_id += 1
-            obj["burg_color"] = self.get_color(self.color_id)
+            for item in add:
+                # get current pose from blender object
+                obj = bpy.data.objects[item]
+                blender_pose = np.eye(4)
+                blender_pose[:,:] = obj.matrix_world
+                # create the instance and set to new pose
+                instance = burg.ObjectInstance(self.object_library[obj["burg_object_type"]],
+                                               pose = blender_pose.copy())
+                self.scene.objects.append(instance)
+                self.blender_to_burg[item] = instance
+                # needs a new color
+                self.color_id += 1
+                obj["burg_color"] = self.get_color(self.color_id)
 
-        update_display_colors()
-        #TODO: need to also update area size and printout?
-        # It is important that during loading of a scene area_size property gets updated
-        size = get_size(bpy.context.scene.burg_params.area_size)
-        if not self.scene.ground_area == size:
-            # either change here or trigger an update
-            print("different sizes")
-            self.scene.ground_area = size
+            update_display_colors()
+            #TODO: need to also update area size and printout?
+            # It is important that during loading of a scene area_size property gets updated
+            size = get_size(bpy.context.scene.burg_params.area_size)
+            if not self.scene.ground_area == size:
+                # either change here or trigger an update
+                print("different sizes")
+                self.scene.ground_area = size
+        except Exception as e:
+            print(e)
             
 
 def get_stable_poses(instance):

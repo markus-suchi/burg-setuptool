@@ -59,10 +59,10 @@ class BURG_OT_update_scene(bpy.types.Operator):
     bl_label = "Update Scene"
 
     def execute(self, context):
+        print("Update scene")
         mng.synchronize()
         mng.update_scene_poses()
         burg_params = bpy.context.scene.burg_params
-        # mng.simulate_scene(verbose=True)
         if(mng.check_status()):
             mng.simulate_scene(verbose=burg_params.view_simulation)
             mng.update_blender_poses()
@@ -78,7 +78,6 @@ class BURG_OT_load_object_library(bpy.types.Operator):
     bl_idname = "burg.load_object_library"
     bl_label = "Load Object Library"
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
-    loaded: bpy.props.BoolProperty(name="loaded", default=False)
 
     def execute(self, context):
         try:
@@ -346,10 +345,11 @@ class BURG_OT_add_object(bpy.types.Operator):
     bl_label = "Add object"
 
     def execute(self, context):
-        wm = context.window_manager
+        print("Add object")
+        scene = context.scene
         burg_params = context.scene.burg_params
-        if wm.burg_objects and wm.burg_object_index >= 0:
-            key = wm.burg_objects[wm.burg_object_index]
+        if scene.burg_objects and scene.burg_object_index >= 0:
+            key = scene.burg_objects[scene.burg_object_index]
             obj = mng.add_object(key.id)
             utils.set_active_and_select(obj)
             bpy.ops.burg.update_scene()
@@ -405,16 +405,17 @@ class BURG_PT_object_selection(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        wm = context.window_manager
+        scene = context.scene
         row = layout.row()
-        row.template_list("BURG_UL_objects", "", wm,
-                          "burg_objects", wm, "burg_object_index", rows=5)
+        row.template_list("BURG_UL_objects", "", scene,
+                          "burg_objects", scene, "burg_object_index", rows=5)
         row = layout.row()
         row.operator("burg.add_object")
 
 
 class BURG_PT_object_preview(bpy.types.Panel):
     """Preview panel for selected object"""
+    global burg_object_previews
 
     bl_label = "Preview"
     bl_space_type = 'VIEW_3D'
@@ -425,9 +426,9 @@ class BURG_PT_object_preview(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        wm = context.window_manager
-        if wm.burg_objects and wm.burg_object_index >= 0 and burg_object_previews:
-            key = wm.burg_objects[wm.burg_object_index]
+        scene = context.scene
+        if scene.burg_objects and scene.burg_object_index >= 0 and burg_object_previews:
+            key = scene.burg_objects[scene.burg_object_index]
             layout.template_icon(burg_object_previews[key.id].icon_id, scale=7)
 
 
@@ -438,18 +439,35 @@ class BURG_PG_object(bpy.types.PropertyGroup):
 
 
 def update_burg_object_index(self, context):
+    print("update_burg_object_index")
     global burg_object_previews
 
-    wm = context.window_manager
+    scene = context.scene
 
-    if wm.burg_object_index >= 0 and wm.burg_object_list:
-        item = wm.burg_object_list[wm.burg_object_index]
+    if not burg_object_previews:
+        print("previews are empty")
+        return
+
+    if not scene.burg_object_index:
+        print("previews are empty")
+        return
+
+    if not scene.burg_object_list.get(scene.burg_object_index):
+        print("index is not found")
+
+    if scene.burg_object_index >= 0 and scene.burg_object_list:
+        try:
+            item = scene.burg_object_list[scene.burg_object_index]
+        except Exception as e:
+            print("Preview error:")
+            print(e)
 
 
 def update_burg_objects(self, context):
+    print("update_burg_objects")
     global burg_object_previews
 
-    wm = context.window_manager
+    scene = context.scene
     # Unfortunately this gets called everytime one clicks or opens the dialog
     # Even if canceling the dialog
     # Maybe make old and new entry compare and only reload when dirty
@@ -463,13 +481,14 @@ def update_burg_objects(self, context):
 
         if burg_object_previews:
             bpy.utils.previews.remove(burg_object_previews)
+            burg_object_previews = None
 
-        wm.burg_objects.clear()
+        scene.burg_objects.clear()
 
         burg_object_previews = bpy.utils.previews.new()
 
         for o in mng.object_library:
-            item = wm.burg_objects.add()
+            item = scene.burg_objects.add()
             item.id = o
             item.name = bol[o].name
             # add the preview to the collection
@@ -487,10 +506,12 @@ def update_burg_objects(self, context):
 
 
 def update_stable_poses(self, context):
+    print("update_stable_poses")
     mng.set_to_stable_pose(context.active_object)
 
 
 def set_stable_poses(self, value):
+    print("set_stable_poses")
     active = bpy.context.active_object
     if active and mng.is_burg_object(active):
         n = len(mng.get_stable_poses(active))
@@ -507,11 +528,13 @@ def get_stable_poses(self):
 
 
 def update_lock_transform(self, context):
+    print("update_lock_transform")
     burg_params = context.scene.burg_params
     mng.lock_transform(burg_params.lock_transform)
 
 
 def update_area_size(self, context):
+    print("update_area_size")
     burg_params = context.scene.burg_params
     plane = bpy.context.scene.objects["Plane"]
     size = utils.get_size(burg_params.area_size)
@@ -535,8 +558,10 @@ def update_area_size(self, context):
     utils.trigger_display_update(burg_params)
 
 def update_display_colors(self, context):
+    print("update_display_colors")
     utils.update_display_colors()
-
+    print("finished")
+    
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
         name="#Objects used for Random Scene.", default=1)
@@ -569,6 +594,7 @@ class BURG_PG_params(bpy.types.PropertyGroup):
 
 # GENERAL OPERATORS
 class delete_override(bpy.types.Operator):
+    print("Called delete overrid")
     # Overriding delete operator
     # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
     """delete objects and their derivatives"""
@@ -598,6 +624,52 @@ class delete_override(bpy.types.Operator):
         else:
             return self.execute(context)
 
+from bpy.app.handlers import persistent
+
+
+@persistent
+def sync_handler(scene):
+    global burg_object_previews
+    print("Called Sync Handler")
+    #check if the object_library file has changed
+    current_library_file = scene.burg_params.object_library_file
+    mng_library_file = None
+    print(f"current {current_library_file}")
+    if mng.object_library:
+        print(f"scene {mng.object_library.filename}")
+        mng_library_file = mng.object_library.filename
+
+    if not (current_library_file == mng_library_file):
+        print("Object library has changed")
+       #check if we still have a scene
+        if not mng.is_valid_scene() and current_library_file:
+            print("Current Scene is invalid and new library file")
+            # need to create a valid scene with the proposed object library
+            bpy.ops.burg.load_object_library(filepath = current_library_file)
+        elif mng.is_valid_scene() and current_library_file:
+            print("Current Scene is valid and new library file")
+            bpy.ops.burg.load_object_library(filepath = current_library_file)
+        elif mng.is_valid_scene() and not current_library_file:
+            print("Current Scene is valid and new library file is invalid")
+            mng.scene = None
+            mng.object_library = None
+            mng.object_library_file = None
+            print("Clear the previews")
+            if burg_object_previews:
+                bpy.utils.previews.remove(burg_object_previews)
+        else:
+            # not mng.is_valid_scene() and not current_library_file
+            print("No valid scene and no new library file")
+            print(f"{mng.is_valid_scene()}")
+            print(f"{current_library_file}")
+            for area in bpy.context.screen.areas:
+                area.tag_redraw()
+            return
+
+    mng.synchronize()
+
+    for area in bpy.context.screen.areas:
+        area.tag_redraw()
 
 classes = (
     BURG_PT_object_library,
@@ -636,12 +708,12 @@ def register():
     bpy.types.Scene.burg_params = bpy.props.PointerProperty(
         type=BURG_PG_params)
 
-    bpy.types.WindowManager.burg_objects = bpy.props.CollectionProperty(
+    bpy.types.Scene.burg_objects = bpy.props.CollectionProperty(
         name="BURG Objects",
         type=BURG_PG_object
     )
 
-    bpy.types.WindowManager.burg_object_index = bpy.props.IntProperty(
+    bpy.types.Scene.burg_object_index = bpy.props.IntProperty(
         name="Index for Object List")
 
     bpy.types.Object.burg_stable_poses = bpy.props.IntProperty(name="Stable Poses",
@@ -649,6 +721,9 @@ def register():
                                                                get=get_stable_poses,
                                                                update=update_stable_poses
                                                                )
+
+    bpy.app.handlers.undo_post.append(sync_handler)
+    bpy.app.handlers.redo_post.append(sync_handler)
 
 
 def unregister():
@@ -659,12 +734,15 @@ def unregister():
 
     if burg_object_previews:
         bpy.utils.previews.remove(burg_object_previews)
+        burg_object_previews = None
 
     del bpy.types.Scene.burg_params
-    del bpy.types.WindowManager.burg_objects
-    del bpy.types.WindowManager.burg_object_index
+    del bpy.types.Scene.burg_objects
+    del bpy.types.Scene.burg_object_index
     del bpy.types.Object.burg_stable_poses
-
+    
+    bpy.app.handlers.undo_post.remove(sync_handler)
+    bpy.app.handlers.redo_post.remove(sync_handler)
 
 if __name__ == "__main__":
     register()
