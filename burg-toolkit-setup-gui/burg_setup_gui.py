@@ -1,3 +1,4 @@
+from bpy.app.handlers import persistent
 import bpy.utils.previews
 import bpy
 import mathutils
@@ -18,6 +19,7 @@ class BURG_OT_random_scene(bpy.types.Operator):
 
     bl_idname = "burg.random_scene"
     bl_label = "Create Random Scene"
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         burg_params = context.scene.burg_params
@@ -39,14 +41,15 @@ class BURG_OT_empty_scene(bpy.types.Operator):
 
     bl_idname = "burg.empty_scene"
     bl_label = "Create Empty Scene"
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
         burg_params = context.scene.burg_params
+        mng.remove_blender_objects()
         mng.empty_scene(burg_params.object_library_file,
                         ground_area=utils.get_size(
                             burg_params.area_size))
         mng.simulate_scene(verbose=burg_params.view_simulation)
-        mng.remove_blender_objects()
         mng.check_status()
         utils.trigger_display_update(burg_params)
         return {'FINISHED'}
@@ -59,7 +62,6 @@ class BURG_OT_update_scene(bpy.types.Operator):
     bl_label = "Update Scene"
 
     def execute(self, context):
-        print("Update scene")
         mng.synchronize()
         mng.update_scene_poses()
         burg_params = bpy.context.scene.burg_params
@@ -84,8 +86,8 @@ class BURG_OT_load_object_library(bpy.types.Operator):
             # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
             burg_params.object_library_file = self.filepath
-            mng.empty_scene(burg_params.object_library_file, 
-                            ground_area = utils.get_size(burg_params.area_size))
+            mng.empty_scene(burg_params.object_library_file,
+                            ground_area=utils.get_size(burg_params.area_size))
             update_burg_objects(self, context)
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             return {'FINISHED'}
@@ -156,9 +158,6 @@ class BURG_OT_save_scene(bpy.types.Operator):
             return {'CANCELLED'}
 
     def invoke(self, context, event):
-       # if not mng.scene:
-       #     return
-
        # set filepath with default value of property
         self.filepath = self.filepath
         context.window_manager.fileselect_add(self)
@@ -170,27 +169,28 @@ class BURG_OT_load_scene(bpy.types.Operator):
 
     bl_idname = "burg.load_scene"
     bl_label = "Load Scene"
+    bl_options = {"REGISTER", "UNDO"}
+
     filepath: bpy.props.StringProperty(
         subtype="FILE_PATH", default="*.yaml")
 
     def execute(self, context):
-        try:
-            mng.load_scene(self.filepath)
-            # TODO: Error handling when opening incomplete/not processed library file.
-            burg_params = context.scene.burg_params
-            burg_params.object_library_file = mng.object_library_file
-            update_burg_objects(self, context)
-            utils.update_display_colors()
-            mng.lock_transform(burg_params.lock_transform)
-            
-            burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area] 
+        mng.load_scene(self.filepath)
+        # TODO: Error handling when opening incomplete/not processed library file.
+        burg_params = context.scene.burg_params
+        burg_params.object_library_file = mng.object_library_file
+        update_burg_objects(self, context)
+        utils.update_display_colors()
+        mng.lock_transform(burg_params.lock_transform)
 
-            utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
-            return {'FINISHED'}
-        except Exception as e:
-            print(f"Could not load scene file: {self.filepath}.")
-            print(e)
-            return {'CANCELLED'}
+        burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
+
+        utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+        return {'FINISHED'}
+        # except Exception as e:
+        #    print(f"Could not load scene file: {self.filepath}.")
+        #    print(e)
+        #    return {'CANCELLED'}
 
     def invoke(self, context, event):
        # set filepath with default value of property
@@ -343,9 +343,9 @@ class BURG_OT_add_object(bpy.types.Operator):
 
     bl_idname = "burg.add_object"
     bl_label = "Add object"
+    bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        print("Add object")
         scene = context.scene
         burg_params = context.scene.burg_params
         if scene.burg_objects and scene.burg_object_index >= 0:
@@ -363,28 +363,14 @@ class BURG_OT_add_object(bpy.types.Operator):
 burg_object_previews = None
 
 
-def get_preview(key):
-    global burg_object_previews
-
-    if burg_object_previews:
-        if key not in burg_object_previews:
-            print(f"Preview key {key} not found")
-            #TODO: preview_key = "missing_preview"
-            return None
-        else:
-            return burg_object_previews[key]
-    else:
-        return None
-
-
 class BURG_UL_objects(bpy.types.UIList):
     """
     List of available objects
     """
 
-    global burg_object_previews
-
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        global burg_object_previews
+
         if item and burg_object_previews:
             layout.label(text=item.name,
                          icon_value=burg_object_previews[item.id].icon_id)
@@ -415,7 +401,6 @@ class BURG_PT_object_selection(bpy.types.Panel):
 
 class BURG_PT_object_preview(bpy.types.Panel):
     """Preview panel for selected object"""
-    global burg_object_previews
 
     bl_label = "Preview"
     bl_space_type = 'VIEW_3D'
@@ -425,6 +410,8 @@ class BURG_PT_object_preview(bpy.types.Panel):
     bl_category = "BURG Setup Template"
 
     def draw(self, context):
+        global burg_object_previews
+
         layout = self.layout
         scene = context.scene
         if scene.burg_objects and scene.burg_object_index >= 0 and burg_object_previews:
@@ -439,32 +426,13 @@ class BURG_PG_object(bpy.types.PropertyGroup):
 
 
 def update_burg_object_index(self, context):
-    print("update_burg_object_index")
-    global burg_object_previews
 
     scene = context.scene
-
-    if not burg_object_previews:
-        print("previews are empty")
-        return
-
-    if not scene.burg_object_index:
-        print("previews are empty")
-        return
-
-    if not scene.burg_object_list.get(scene.burg_object_index):
-        print("index is not found")
-
     if scene.burg_object_index >= 0 and scene.burg_object_list:
-        try:
-            item = scene.burg_object_list[scene.burg_object_index]
-        except Exception as e:
-            print("Preview error:")
-            print(e)
+        item = scene.burg_object_list[scene.burg_object_index]
 
 
 def update_burg_objects(self, context):
-    print("update_burg_objects")
     global burg_object_previews
 
     scene = context.scene
@@ -506,12 +474,10 @@ def update_burg_objects(self, context):
 
 
 def update_stable_poses(self, context):
-    print("update_stable_poses")
     mng.set_to_stable_pose(context.active_object)
 
 
 def set_stable_poses(self, value):
-    print("set_stable_poses")
     active = bpy.context.active_object
     if active and mng.is_burg_object(active):
         n = len(mng.get_stable_poses(active))
@@ -528,13 +494,12 @@ def get_stable_poses(self):
 
 
 def update_lock_transform(self, context):
-    print("update_lock_transform")
     burg_params = context.scene.burg_params
     mng.lock_transform(burg_params.lock_transform)
 
 
 def update_area_size(self, context):
-    print("update_area_size")
+    print("update area size")
     burg_params = context.scene.burg_params
     plane = bpy.context.scene.objects["Plane"]
     size = utils.get_size(burg_params.area_size)
@@ -545,7 +510,7 @@ def update_area_size(self, context):
     np_image = burg.printout.Printout(size).get_image()
     h, w = np_image.shape
     img.scale(w, h)
-    
+
     img.pixels[:] = utils.convert_numpy_image(np_image)
     img.update()
 
@@ -557,11 +522,11 @@ def update_area_size(self, context):
 
     utils.trigger_display_update(burg_params)
 
+
 def update_display_colors(self, context):
-    print("update_display_colors")
     utils.update_display_colors()
-    print("finished")
-    
+
+
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
         name="#Objects used for Random Scene.", default=1)
@@ -594,7 +559,6 @@ class BURG_PG_params(bpy.types.PropertyGroup):
 
 # GENERAL OPERATORS
 class delete_override(bpy.types.Operator):
-    print("Called delete overrid")
     # Overriding delete operator
     # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
     """delete objects and their derivatives"""
@@ -624,52 +588,40 @@ class delete_override(bpy.types.Operator):
         else:
             return self.execute(context)
 
-from bpy.app.handlers import persistent
-
 
 @persistent
 def sync_handler(scene):
     global burg_object_previews
-    print("Called Sync Handler")
-    #check if the object_library file has changed
+
+    # check if the object_library file has changed
     current_library_file = scene.burg_params.object_library_file
     mng_library_file = None
-    print(f"current {current_library_file}")
     if mng.object_library:
-        print(f"scene {mng.object_library.filename}")
         mng_library_file = mng.object_library.filename
 
     if not (current_library_file == mng_library_file):
-        print("Object library has changed")
-       #check if we still have a scene
+       # check if we still have a scene
         if not mng.is_valid_scene() and current_library_file:
-            print("Current Scene is invalid and new library file")
             # need to create a valid scene with the proposed object library
-            bpy.ops.burg.load_object_library(filepath = current_library_file)
+            bpy.ops.burg.load_object_library(filepath=current_library_file)
         elif mng.is_valid_scene() and current_library_file:
-            print("Current Scene is valid and new library file")
-            bpy.ops.burg.load_object_library(filepath = current_library_file)
+            bpy.ops.burg.load_object_library(filepath=current_library_file)
         elif mng.is_valid_scene() and not current_library_file:
-            print("Current Scene is valid and new library file is invalid")
+            mng.scene.objects.clear()
             mng.scene = None
             mng.object_library = None
             mng.object_library_file = None
-            print("Clear the previews")
             if burg_object_previews:
                 bpy.utils.previews.remove(burg_object_previews)
+            if bpy.context.scene.burg_objects:
+                burg_objects.clear()
         else:
             # not mng.is_valid_scene() and not current_library_file
-            print("No valid scene and no new library file")
-            print(f"{mng.is_valid_scene()}")
-            print(f"{current_library_file}")
             for area in bpy.context.screen.areas:
                 area.tag_redraw()
-            return
 
     mng.synchronize()
 
-    for area in bpy.context.screen.areas:
-        area.tag_redraw()
 
 classes = (
     BURG_PT_object_library,
@@ -740,9 +692,10 @@ def unregister():
     del bpy.types.Scene.burg_objects
     del bpy.types.Scene.burg_object_index
     del bpy.types.Object.burg_stable_poses
-    
+
     bpy.app.handlers.undo_post.remove(sync_handler)
     bpy.app.handlers.redo_post.remove(sync_handler)
+
 
 if __name__ == "__main__":
     register()

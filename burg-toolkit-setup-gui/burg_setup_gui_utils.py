@@ -22,8 +22,8 @@ BURG_STATUS_COLORS = {BurgStatus.OK: (0, 1, 0),
                       BurgStatus.OUT_OF_BOUNDS: (1, 0, 1)}
 
 BLENDER_TO_BURG_SIZES = {"SIZE_A2": burg.constants.SIZE_A2,
-                       "SIZE_A3": burg.constants.SIZE_A3,
-                       "SIZE_A4": burg.constants.SIZE_A4}
+                         "SIZE_A3": burg.constants.SIZE_A3,
+                         "SIZE_A4": burg.constants.SIZE_A4}
 
 BURG_TO_BLENDER_SIZES = {burg.constants.SIZE_A2: "SIZE_A2",
                          burg.constants.SIZE_A3: "SIZE_A3",
@@ -98,7 +98,6 @@ class SceneManager(object):
         return self.object_library_file == object_library_file
 
     def set_area_size(self, size):
-        print(f"Set size to {get_size(size)}")
         self.scene.ground_area = get_size(size)
 
     def load_object_library(self, filepath):
@@ -116,10 +115,9 @@ class SceneManager(object):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
             self.object_library_file = filepath
 
-        #Loading a new object_library invalidates the scene and mapping
+        # Loading a new object_library invalidates the scene and mapping
         self.blender_to_burg.clear()
         self.scene = None
-
 
     def random_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, n_instances=1, n_instances_objects=1):
         """
@@ -154,7 +152,6 @@ class SceneManager(object):
         self.load_object_library(object_library_file)
 
         if self.scene:
-            print("removing current scene")
             self.remove_blender_objects()
             self.scene.objects.clear()
 
@@ -183,6 +180,7 @@ class SceneManager(object):
                     self.scene = scene
                     self.object_library = library
                     self.object_library_file = library.filename
+                    self.blender_to_burg.clear()
                     for item in self.scene.objects:
                         self.add_burg_instance_to_blender(item)
             except Exception as e:
@@ -190,9 +188,7 @@ class SceneManager(object):
                 print(e)
 
     def save_scene(self, scene_file=None):
-        if not scene_file:
-            print(f"Empty scene_file.")
-        else:
+        if scene_file:
             try:
                 self.scene.to_yaml(scene_file, self.object_library)
             except Exception as e:
@@ -414,49 +410,50 @@ class SceneManager(object):
             return None
 
     def synchronize(self):
-        #only synchronize if there is a scene
+        # only synchronize if there is a scene
         try:
-            print("Manager synchronize")
-            if not self.scene:
-                print("Tried to synch an empty scene.")
-                return
+            if self.scene:
+                key = set(self.blender_to_burg.keys())
+                active = {obj.name
+                          for obj in bpy.data.objects if obj.get("burg_object_type")}
+                delete = key - active
+                add = active - key
 
-            key = set(self.blender_to_burg.keys())
-            active = {obj.name 
-                         for obj in bpy.data.objects if obj.get("burg_object_type")}
-            delete = key - active     
-            add = active - key
+                for item in delete:
+                    instance = self.blender_to_burg.pop(item, None)
+                    if instance:
+                        self.scene.objects.remove(instance)
 
-            for item in delete:
-                instance = self.blender_to_burg.pop(item, None) 
-                if instance:
-                    self.scene.objects.remove(instance)
+                for item in add:
+                    # get current pose from blender object
+                    obj = bpy.data.objects[item]
+                    blender_pose = np.eye(4)
+                    blender_pose[:, :] = obj.matrix_world
+                    # create the instance and set to new pose
+                    instance = burg.ObjectInstance(self.object_library[obj["burg_object_type"]],
+                                                   pose=blender_pose.copy())
+                    self.scene.objects.append(instance)
+                    self.blender_to_burg[item] = instance
+                    # needs a new color
+                    self.color_id += 1
+                    obj["burg_color"] = self.get_color(self.color_id)
 
-            for item in add:
-                # get current pose from blender object
-                obj = bpy.data.objects[item]
-                blender_pose = np.eye(4)
-                blender_pose[:,:] = obj.matrix_world
-                # create the instance and set to new pose
-                instance = burg.ObjectInstance(self.object_library[obj["burg_object_type"]],
-                                               pose = blender_pose.copy())
-                self.scene.objects.append(instance)
-                self.blender_to_burg[item] = instance
-                # needs a new color
-                self.color_id += 1
-                obj["burg_color"] = self.get_color(self.color_id)
+                update_display_colors()
 
-            update_display_colors()
-            #TODO: need to also update area size and printout?
-            # It is important that during loading of a scene area_size property gets updated
-            size = get_size(bpy.context.scene.burg_params.area_size)
-            if not self.scene.ground_area == size:
-                # either change here or trigger an update
-                print("different sizes")
-                self.scene.ground_area = size
+                # TODO: need to also update printout?
+                size = get_size(bpy.context.scene.burg_params.area_size)
+                if not self.scene.ground_area == size:
+                    self.scene.ground_area = size
+
+            # To trigger update callback we have to reset this value
+            size = bpy.context.scene.burg_params.area_size
+            bpy.context.scene.burg_params.area_size = size
+            for area in bpy.context.screen.areas:
+                area.tag_redraw()
         except Exception as e:
+            print("Error during synchronize.")
             print(e)
-            
+
 
 def get_stable_poses(instance):
     stable_poses = []
@@ -468,6 +465,7 @@ def get_stable_poses(instance):
 
     return stable_poses
 
+
 def update_display_colors():
     burg_params = bpy.context.scene.burg_params
     burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
@@ -477,6 +475,7 @@ def update_display_colors():
     elif burg_params.view_mode == 'view_state':
         for o in burg_objects:
             o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
+
 
 def trigger_display_update(params):
     if params.view_mode == 'view_state':
@@ -494,8 +493,9 @@ def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
                     if region.type == region_type:
                         region.tag_redraw()
 
+
 def set_active_and_select(obj):
-    bpy.context.view_layer.objects.active=obj
+    bpy.context.view_layer.objects.active = obj
     for selected in bpy.context.selected_objects:
         selected.select_set(False)
     obj.select_set(True)
