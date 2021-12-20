@@ -100,6 +100,18 @@ class SceneManager(object):
     def set_area_size(self, size):
         self.scene.ground_area = get_size(size)
 
+    def complete_object_library(self):
+        lib = self.object_library
+
+        if lib and not lib.objects_have_all_attributes():
+            lib.generate_vhacd_files(override=False)
+            lib.generate_urdf_files(override=False, use_vhacd=True)
+            lib.compute_stable_poses(verify_in_sim=True, override=False)
+            engine = burg.render.RenderEngineFactory.create('pybullet')
+            lib.generate_thumbnails(render_engine=engine, override=False)
+            engine.dismiss()
+            lib.to_yaml(lib.filename)
+
     def load_object_library(self, filepath):
         """
         Loads and updates object library related interface items.
@@ -114,6 +126,7 @@ class SceneManager(object):
         if not self.same_object_library(filepath):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
             self.object_library_file = filepath
+            self.complete_object_library()
 
         # Loading a new object_library invalidates the scene and mapping
         self.blender_to_burg.clear()

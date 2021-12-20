@@ -499,7 +499,6 @@ def update_lock_transform(self, context):
 
 
 def update_area_size(self, context):
-    print("update area size")
     burg_params = context.scene.burg_params
     plane = bpy.context.scene.objects["Plane"]
     size = utils.get_size(burg_params.area_size)
