@@ -209,7 +209,7 @@ class SceneManager(object):
     def save_scene(self, scene_file=None):
         if scene_file:
             try:
-                #create a printout with current settings
+                # create a printout with current settings
                 printout = burg.Printout()
                 self.scene.to_yaml(scene_file, self.object_library)
             except Exception as e:
@@ -389,7 +389,7 @@ class SceneManager(object):
 
         for key in self.blender_to_burg.keys():
             obj = bpy.data.objects[key]
-            #always lock scaling
+            # always lock scaling
             obj.lock_scale = [True, True, True]
             if enable:
                 obj.lock_location[2] = True

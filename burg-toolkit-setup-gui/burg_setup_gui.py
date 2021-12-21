@@ -70,6 +70,7 @@ class BURG_OT_update_scene(bpy.types.Operator):
         return (context is not None and mng.is_valid_scene())
 
     def execute(self, context):
+        print("Update scene")
         bpy.context.window.cursor_set("WAIT")
         mng.synchronize()
         mng.update_scene_poses()
@@ -90,6 +91,7 @@ class BURG_OT_load_object_library(bpy.types.Operator):
     bl_idname = "burg.load_object_library"
     bl_label = "Load Object Library"
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
+    filter_glob: bpy.props.StringProperty(default="*.yaml")
 
     def execute(self, context):
         try:
@@ -185,8 +187,8 @@ class BURG_OT_load_scene(bpy.types.Operator):
     bl_label = "Load Scene"
     bl_options = {"REGISTER", "UNDO"}
 
-    filepath: bpy.props.StringProperty(
-        subtype="FILE_PATH", default="*.yaml")
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
+    filter_glob: bpy.props.StringProperty(default="*.yaml")
 
     def execute(self, context):
         try:
@@ -246,9 +248,9 @@ class BURG_PT_object_library(bpy.types.Panel):
         row = layout.row()
         row.operator("burg.load_object_library", text='New')
         row = layout.row()
-        row.operator("burg.load_scene", text="Open")
+        row.operator("burg.load_scene", text="Import")
         row = layout.row()
-        row.operator("burg.save_scene", text="Save")
+        row.operator("burg.save_scene", text="Export")
         row = layout.row()
         row.prop(burg_params, "area_size", text="Size")
         row = layout.row()
@@ -552,9 +554,9 @@ def update_display_colors(self, context):
 
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
-        name="#Objects used for Random Scene.", default=1, min = 1)
+        name="#Objects used for Random Scene.", default=1, min=1)
     number_instances: bpy.props.IntProperty(
-        name="#Instances used for Random Scene.", default=1, min = 1)
+        name="#Instances used for Random Scene.", default=1, min=1)
     view_simulation: bpy.props.BoolProperty(
         name="View Simulation", default=False)
     object_library_file: bpy.props.StringProperty(
@@ -613,17 +615,41 @@ class delete_override(bpy.types.Operator):
 
 
 @persistent
+def load_handler(scene):
+    # Blender does not allow to store persistent data over several blend files.
+    # Thus removing current scene and starting from scratch is the only way
+    sync_handler(scene)
+    mng.update_scene_poses()
+    mng.check_status()
+    utils.update_display_colors()
+
+
+@persistent
 def sync_handler(scene):
     global burg_object_previews
 
-    # check if the object_library file has changed
-    current_library_file = scene.burg_params.object_library_file
+   # check if the object_library file has changed
+    if not bpy.context.scene or not bpy.context.scene.get("burg_params"):
+       # starting fresh
+        if mng.is_valid_scene():
+            mng.scene.objects.clear()
+            mng.scene = None
+            mng.object_library = None
+            mng.object_library_file = None
+            mng.blender_to_burg.clear()
+            if burg_object_previews:
+                bpy.utils.previews.remove(burg_object_previews)
+            if bpy.context.scene.burg_objects:
+                burg_objects.clear()
+        return
+
+    current_library_file = bpy.context.scene.burg_params.object_library_file
     mng_library_file = None
     if mng.object_library:
         mng_library_file = mng.object_library.filename
 
     if not (current_library_file == mng_library_file):
-       # check if we still have a scene
+        # check if we still have a scene
         if not mng.is_valid_scene() and current_library_file:
             # need to create a valid scene with the proposed object library
             bpy.ops.burg.load_object_library(filepath=current_library_file)
@@ -699,6 +725,8 @@ def register():
 
     bpy.app.handlers.undo_post.append(sync_handler)
     bpy.app.handlers.redo_post.append(sync_handler)
+    bpy.app.handlers.load_post.append(load_handler)
+    # bpy.app.handlers.load_post.append(load_handler)
 
 
 def unregister():
@@ -718,6 +746,8 @@ def unregister():
 
     bpy.app.handlers.undo_post.remove(sync_handler)
     bpy.app.handlers.redo_post.remove(sync_handler)
+    # bpy.app.handlers.load_post.remove(load_handler)
+    bpy.app.handlers.load_post.remove(load_handler)
 
 
 if __name__ == "__main__":
