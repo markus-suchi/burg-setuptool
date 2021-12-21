@@ -389,6 +389,8 @@ class SceneManager(object):
 
         for key in self.blender_to_burg.keys():
             obj = bpy.data.objects[key]
+            #always lock scaling
+            obj.lock_scale = [True, True, True]
             if enable:
                 obj.lock_location[2] = True
                 obj.lock_rotation[0] = True

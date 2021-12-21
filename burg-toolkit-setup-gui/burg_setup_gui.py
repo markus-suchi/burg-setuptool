@@ -63,7 +63,7 @@ class BURG_OT_update_scene(bpy.types.Operator):
     """ Update scene """
 
     bl_idname = "burg.update_scene"
-    bl_label = "Update Scene"
+    bl_label = "Update"
 
     @classmethod
     def poll(self, context):
@@ -257,7 +257,7 @@ class BURG_PT_object_library(bpy.types.Panel):
 
 
 class BURG_PT_scene(bpy.types.Panel):
-    bl_label = "Scene Actions"
+    bl_label = "Actions"
     bl_idname = "BURG_PT_scene"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -292,7 +292,7 @@ class BURG_PT_scene(bpy.types.Panel):
 
 
 class BURG_PT_new_scene(bpy.types.Panel):
-    bl_label = "Create Scene"
+    bl_label = "Create"
     bl_idname = "BURG_PT_new_scene"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -312,9 +312,9 @@ class BURG_PT_new_scene(bpy.types.Panel):
         burg_params = scene.burg_params
 
         row = layout.row()
-        row.operator("burg.empty_scene", text="Create Empty")
+        row.operator("burg.empty_scene", text="Empty")
         row = layout.row()
-        row.operator("burg.random_scene", text='Create Random')
+        row.operator("burg.random_scene", text='Random')
         row = layout.row()
         row.prop(burg_params, "area_size", text='Size')
         row = layout.row()
@@ -552,9 +552,9 @@ def update_display_colors(self, context):
 
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
-        name="#Objects used for Random Scene.", default=1)
+        name="#Objects used for Random Scene.", default=1, min = 1)
     number_instances: bpy.props.IntProperty(
-        name="#Instances used for Random Scene.", default=1)
+        name="#Instances used for Random Scene.", default=1, min = 1)
     view_simulation: bpy.props.BoolProperty(
         name="View Simulation", default=False)
     object_library_file: bpy.props.StringProperty(
