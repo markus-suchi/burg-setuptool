@@ -22,6 +22,7 @@ class BURG_OT_random_scene(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        bpy.context.window.cursor_set("WAIT")
         burg_params = context.scene.burg_params
         mng.remove_blender_objects()
         mng.random_scene(burg_params.object_library_file,
@@ -33,6 +34,7 @@ class BURG_OT_random_scene(bpy.types.Operator):
         mng.check_status()
         mng.lock_transform(burg_params.lock_transform)
         utils.trigger_display_update(burg_params)
+        bpy.context.window.cursor_set("DEFAULT")
         return {'FINISHED'}
 
 
@@ -44,6 +46,7 @@ class BURG_OT_empty_scene(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        bpy.context.window.cursor_set("WAIT")
         burg_params = context.scene.burg_params
         mng.remove_blender_objects()
         mng.empty_scene(burg_params.object_library_file,
@@ -52,6 +55,7 @@ class BURG_OT_empty_scene(bpy.types.Operator):
         mng.simulate_scene(verbose=burg_params.view_simulation)
         mng.check_status()
         utils.trigger_display_update(burg_params)
+        bpy.context.window.cursor_set("DEFAULT")
         return {'FINISHED'}
 
 
@@ -61,7 +65,12 @@ class BURG_OT_update_scene(bpy.types.Operator):
     bl_idname = "burg.update_scene"
     bl_label = "Update Scene"
 
+    @classmethod
+    def poll(self, context):
+        return (context is not None and mng.is_valid_scene())
+
     def execute(self, context):
+        bpy.context.window.cursor_set("WAIT")
         mng.synchronize()
         mng.update_scene_poses()
         burg_params = bpy.context.scene.burg_params
@@ -71,6 +80,7 @@ class BURG_OT_update_scene(bpy.types.Operator):
             mng.check_status()
 
         utils.trigger_display_update(burg_params)
+        bpy.context.window.cursor_set("DEFAULT")
         return{'FINISHED'}
 
 
@@ -83,6 +93,7 @@ class BURG_OT_load_object_library(bpy.types.Operator):
 
     def execute(self, context):
         try:
+            bpy.context.window.cursor_set("WAIT")
             # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
             burg_params.object_library_file = self.filepath
@@ -90,10 +101,12 @@ class BURG_OT_load_object_library(bpy.types.Operator):
                             ground_area=utils.get_size(burg_params.area_size))
             update_burg_objects(self, context)
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+            bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
             print(f"Could not open burg object library: {self.filepath}.")
             print(e)
+            bpy.context.window.cursor_set("DEFAULT")
             return {'CANCELLED'}
 
     def invoke(self, context, event):
@@ -111,11 +124,12 @@ class BURG_OT_save_printout(bpy.types.Operator):
     filepath: bpy.props.StringProperty(
         subtype="FILE_PATH", default="printout.pdf")
 
+    @classmethod
+    def poll(self, context):
+        return (context is not None and mng.is_valid_scene())
+
     def execute(self, context):
         try:
-            if not mng.scene:
-                return
-
             burg_params = context.scene.burg_params
             print_size = utils.get_size(burg_params.printout_size)
             printout = burg.printout.Printout(size=mng.scene.ground_area)
@@ -144,8 +158,8 @@ class BURG_OT_save_scene(bpy.types.Operator):
         subtype="FILE_PATH", default="scene.yaml")
 
     @classmethod
-    def poll(cls, context):
-        return mng.scene is not None
+    def poll(self, context):
+        return (context is not None and mng.is_valid_scene())
 
     def execute(self, context):
         try:
@@ -175,22 +189,26 @@ class BURG_OT_load_scene(bpy.types.Operator):
         subtype="FILE_PATH", default="*.yaml")
 
     def execute(self, context):
-        mng.load_scene(self.filepath)
-        # TODO: Error handling when opening incomplete/not processed library file.
-        burg_params = context.scene.burg_params
-        burg_params.object_library_file = mng.object_library_file
-        update_burg_objects(self, context)
-        utils.update_display_colors()
-        mng.lock_transform(burg_params.lock_transform)
+        try:
+            bpy.context.window.cursor_set("WAIT")
+            mng.load_scene(self.filepath)
+            # TODO: Error handling when opening incomplete/not processed library file.
+            burg_params = context.scene.burg_params
+            burg_params.object_library_file = mng.object_library_file
+            update_burg_objects(self, context)
+            utils.update_display_colors()
+            mng.lock_transform(burg_params.lock_transform)
 
-        burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
+            burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
 
-        utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
-        return {'FINISHED'}
-        # except Exception as e:
-        #    print(f"Could not load scene file: {self.filepath}.")
-        #    print(e)
-        #    return {'CANCELLED'}
+            utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+            bpy.context.window.cursor_set("DEFAULT")
+            return {'FINISHED'}
+        except Exception as e:
+            print(f"Could not load scene file: {self.filepath}.")
+            print(e)
+            bpy.context.window.cursor_set("DEFAULT")
+            return {'CANCELLED'}
 
     def invoke(self, context, event):
        # set filepath with default value of property
@@ -344,6 +362,10 @@ class BURG_OT_add_object(bpy.types.Operator):
     bl_idname = "burg.add_object"
     bl_label = "Add object"
     bl_options = {"REGISTER", "UNDO"}
+
+    @classmethod
+    def poll(self, context):
+        return (context is not None and mng.is_valid_scene())
 
     def execute(self, context):
         scene = context.scene
@@ -499,6 +521,7 @@ def update_lock_transform(self, context):
 
 
 def update_area_size(self, context):
+    bpy.context.window.cursor_set("WAIT")
     burg_params = context.scene.burg_params
     plane = bpy.context.scene.objects["Plane"]
     size = utils.get_size(burg_params.area_size)
@@ -520,6 +543,7 @@ def update_area_size(self, context):
             mng.check_status()
 
     utils.trigger_display_update(burg_params)
+    bpy.context.window.cursor_set("DEFAULT")
 
 
 def update_display_colors(self, context):

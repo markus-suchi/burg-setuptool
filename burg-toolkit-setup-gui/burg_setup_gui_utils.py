@@ -144,12 +144,18 @@ class SceneManager(object):
 
         self.load_object_library(object_library_file)
 
+        if self.scene:
+            self.remove_blender_objects()
+            self.scene.objects.clear()
+
         self.scene = burg.sampling.sample_scene(
             object_library=self.object_library,
             ground_area=ground_area,
             instances_per_scene=n_instances,
             instances_per_object=n_instances_objects
         )
+
+        self.color_id = 0
 
         for item in self.scene.objects:
             self.add_burg_instance_to_blender(item)
@@ -203,6 +209,8 @@ class SceneManager(object):
     def save_scene(self, scene_file=None):
         if scene_file:
             try:
+                #create a printout with current settings
+                printout = burg.Printout()
                 self.scene.to_yaml(scene_file, self.object_library)
             except Exception as e:
                 print(f"Could not save burg scene: {scene_file}")
