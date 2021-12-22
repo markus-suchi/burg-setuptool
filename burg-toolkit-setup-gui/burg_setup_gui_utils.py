@@ -234,7 +234,11 @@ class SceneManager(object):
             print(f"The scene file {scene_file} does not exist.")
         else:
             try:
-                # TODO: hwo to handle printout
+                # TODO: First load might include a incomplete library
+                # Now importing it again after creating it works
+                # If files can be checked before this should move to GUI
+                scene, library, printout = burg.Scene.from_yaml(scene_file)
+                self.load_object_library(library.filename)
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 if scene and library:
                     if self.scene:
@@ -242,8 +246,7 @@ class SceneManager(object):
                         self.scene.objects.clear()
 
                     self.scene = scene
-                    self.object_library = library
-                    self.object_library_file = library.filename
+                    self.scene.object_library = self.object_library
                     self.blender_to_burg.clear()
                     for item in self.scene.objects:
                         self.add_burg_instance_to_blender(item)
@@ -255,7 +258,6 @@ class SceneManager(object):
         if scene_file:
             try:
                 # create a printout with current settings
-                printout = burg.Printout()
                 self.scene.to_yaml(scene_file, self.object_library)
             except Exception as e:
                 print(f"Could not save burg scene: {scene_file}")

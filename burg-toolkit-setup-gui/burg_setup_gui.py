@@ -97,10 +97,10 @@ class BURG_OT_load_object_library(bpy.types.Operator):
             bpy.context.window.cursor_set("WAIT")
             # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
-            burg_params.object_library_file = self.filepath
             mng.remove_blender_objects()
-            mng.empty_scene(burg_params.object_library_file,
+            mng.empty_scene(self.filepath,
                             ground_area=utils.get_size(burg_params.area_size))
+            burg_params.object_library_file = self.filepath
             update_previews(self, context)
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
@@ -532,7 +532,6 @@ def update_area_size(self, context):
     if mng.is_valid_scene():
         mng.set_area_size(burg_params.area_size)
         if mng.check_status():
-            print("UPDATE AREA SIZE")
             mng.simulate_scene(verbose=burg_params.view_simulation)
             mng.check_status()
 
