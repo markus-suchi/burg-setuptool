@@ -243,7 +243,7 @@ class BURG_PT_object_library(bpy.types.Panel):
 
         burg_params = scene.burg_params
         row = layout.row()
-        row.operator("burg.load_object_library", text='New')
+        row.operator("burg.load_object_library", text='Open Object Library')
         row = layout.row()
         row.operator("burg.load_scene", text="Import")
         row = layout.row()
@@ -532,6 +532,7 @@ def update_area_size(self, context):
     if mng.is_valid_scene():
         mng.set_area_size(burg_params.area_size)
         if mng.check_status():
+            print("UPDATE AREA SIZE")
             mng.simulate_scene(verbose=burg_params.view_simulation)
             mng.check_status()
 

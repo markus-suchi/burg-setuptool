@@ -267,7 +267,7 @@ class SceneManager(object):
         """
 
         if not self.scene:
-            return
+            return False
 
         collision_objects = self.scene.colliding_instances()
         out_of_bounds_objects = self.scene.out_of_bounds_instances()
@@ -365,7 +365,7 @@ class SceneManager(object):
         """
 
         if not self.scene:
-            return
+            return None
 
          # retrieve first stable pose as default
         if self.object_library[id].stable_poses:
@@ -470,14 +470,9 @@ class SceneManager(object):
         return (r, g, b, 1)
 
     def get_burg_instance(self, obj):
-        instance = self.blender_to_burg.get(obj.name)
-        if instance:
-            return instance
-        else:
-            return None
+        return self.blender_to_burg.get(obj.name)
 
     def synchronize(self):
-        # only synchronize if there is a scene
         try:
             if self.scene:
                 key = set(self.blender_to_burg.keys())
@@ -512,9 +507,10 @@ class SceneManager(object):
                 if not self.scene.ground_area == size:
                     self.scene.ground_area = size
 
-            # To trigger update callback we have to reset this value
-            size = bpy.context.scene.burg_params.area_size
-            bpy.context.scene.burg_params.area_size = size
+                    # To trigger update callback we have to reset this value
+                    size = bpy.context.scene.burg_params.area_size
+                    bpy.context.scene.burg_params.area_size = size
+
             for area in bpy.context.screen.areas:
                 area.tag_redraw()
         except Exception as e:
