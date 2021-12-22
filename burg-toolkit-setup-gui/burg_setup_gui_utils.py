@@ -69,6 +69,52 @@ def get_size(size):
     return BLENDER_TO_BURG_SIZES[size]
 
 
+def get_stable_poses(instance):
+    stable_poses = []
+    for pose in instance.object_type.stable_poses:
+        new_pose = pose[1].copy()
+        new_pose[0, 3] = 0
+        new_pose[1, 3] = 0
+        stable_poses.append(mathutils.Matrix(new_pose))
+
+    return stable_poses
+
+
+def update_display_colors():
+    burg_params = bpy.context.scene.burg_params
+    burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
+    if burg_params.view_mode == 'view_color':
+        for o in burg_objects:
+            o.color = o["burg_color"]
+    elif burg_params.view_mode == 'view_state':
+        for o in burg_objects:
+            o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
+
+
+def trigger_display_update(params):
+    if params.view_mode == 'view_state':
+        params.view_mode = 'view_state'
+
+
+def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
+    # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
+    # Auto refresh for custom collection property does not work without tagging a redraw
+    """ Redraws given windows area of specific type """
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.spaces[0].type == space_type:
+                for region in area.regions:
+                    if region.type == region_type:
+                        region.tag_redraw()
+
+
+def set_active_and_select(obj):
+    bpy.context.view_layer.objects.active = obj
+    for selected in bpy.context.selected_objects:
+        selected.select_set(False)
+    obj.select_set(True)
+
+
 def singleton(cls):
     instances = {}
 
@@ -175,7 +221,6 @@ class SceneManager(object):
             self.scene.objects.clear()
 
         self.scene = burg.core.Scene(ground_area=ground_area)
-        # reset instance id
         self.color_id = 0
 
     def load_scene(self, scene_file=None):
@@ -189,7 +234,11 @@ class SceneManager(object):
             print(f"The scene file {scene_file} does not exist.")
         else:
             try:
-                # TODO: hwo to handle printout
+                # TODO: First load might include a incomplete library
+                # Now importing it again after creating it works
+                # If files can be checked before this should move to GUI
+                scene, library, printout = burg.Scene.from_yaml(scene_file)
+                self.load_object_library(library.filename)
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 if scene and library:
                     if self.scene:
@@ -197,8 +246,7 @@ class SceneManager(object):
                         self.scene.objects.clear()
 
                     self.scene = scene
-                    self.object_library = library
-                    self.object_library_file = library.filename
+                    self.scene.object_library = self.object_library
                     self.blender_to_burg.clear()
                     for item in self.scene.objects:
                         self.add_burg_instance_to_blender(item)
@@ -210,7 +258,6 @@ class SceneManager(object):
         if scene_file:
             try:
                 # create a printout with current settings
-                printout = burg.Printout()
                 self.scene.to_yaml(scene_file, self.object_library)
             except Exception as e:
                 print(f"Could not save burg scene: {scene_file}")
@@ -222,7 +269,7 @@ class SceneManager(object):
         """
 
         if not self.scene:
-            return
+            return False
 
         collision_objects = self.scene.colliding_instances()
         out_of_bounds_objects = self.scene.out_of_bounds_instances()
@@ -269,7 +316,6 @@ class SceneManager(object):
         """
         Removes all blender objects and their meshes   
         """
-
         for key in self.blender_to_burg.keys():
             obj = bpy.data.objects[key]
             mesh = bpy.data.meshes[obj.data.name]
@@ -321,7 +367,7 @@ class SceneManager(object):
         """
 
         if not self.scene:
-            return
+            return None
 
          # retrieve first stable pose as default
         if self.object_library[id].stable_poses:
@@ -426,14 +472,9 @@ class SceneManager(object):
         return (r, g, b, 1)
 
     def get_burg_instance(self, obj):
-        instance = self.blender_to_burg.get(obj.name)
-        if instance:
-            return instance
-        else:
-            return None
+        return self.blender_to_burg.get(obj.name)
 
     def synchronize(self):
-        # only synchronize if there is a scene
         try:
             if self.scene:
                 key = set(self.blender_to_burg.keys())
@@ -468,57 +509,12 @@ class SceneManager(object):
                 if not self.scene.ground_area == size:
                     self.scene.ground_area = size
 
-            # To trigger update callback we have to reset this value
-            size = bpy.context.scene.burg_params.area_size
-            bpy.context.scene.burg_params.area_size = size
+                    # To trigger update callback we have to reset this value
+                    size = bpy.context.scene.burg_params.area_size
+                    bpy.context.scene.burg_params.area_size = size
+
             for area in bpy.context.screen.areas:
                 area.tag_redraw()
         except Exception as e:
             print("Error during synchronize.")
             print(e)
-
-
-def get_stable_poses(instance):
-    stable_poses = []
-    for pose in instance.object_type.stable_poses:
-        new_pose = pose[1].copy()
-        new_pose[0, 3] = 0
-        new_pose[1, 3] = 0
-        stable_poses.append(mathutils.Matrix(new_pose))
-
-    return stable_poses
-
-
-def update_display_colors():
-    burg_params = bpy.context.scene.burg_params
-    burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
-    if burg_params.view_mode == 'view_color':
-        for o in burg_objects:
-            o.color = o["burg_color"]
-    elif burg_params.view_mode == 'view_state':
-        for o in burg_objects:
-            o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
-
-
-def trigger_display_update(params):
-    if params.view_mode == 'view_state':
-        params.view_mode = 'view_state'
-
-
-def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
-    # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
-    # Auto refresh for custom collection property does not work without tagging a redraw
-    """ Redraws given windows area of specific type """
-    for window in context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.spaces[0].type == space_type:
-                for region in area.regions:
-                    if region.type == region_type:
-                        region.tag_redraw()
-
-
-def set_active_and_select(obj):
-    bpy.context.view_layer.objects.active = obj
-    for selected in bpy.context.selected_objects:
-        selected.select_set(False)
-    obj.select_set(True)
