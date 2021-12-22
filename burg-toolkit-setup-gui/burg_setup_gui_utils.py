@@ -69,6 +69,52 @@ def get_size(size):
     return BLENDER_TO_BURG_SIZES[size]
 
 
+def get_stable_poses(instance):
+    stable_poses = []
+    for pose in instance.object_type.stable_poses:
+        new_pose = pose[1].copy()
+        new_pose[0, 3] = 0
+        new_pose[1, 3] = 0
+        stable_poses.append(mathutils.Matrix(new_pose))
+
+    return stable_poses
+
+
+def update_display_colors():
+    burg_params = bpy.context.scene.burg_params
+    burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
+    if burg_params.view_mode == 'view_color':
+        for o in burg_objects:
+            o.color = o["burg_color"]
+    elif burg_params.view_mode == 'view_state':
+        for o in burg_objects:
+            o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
+
+
+def trigger_display_update(params):
+    if params.view_mode == 'view_state':
+        params.view_mode = 'view_state'
+
+
+def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
+    # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
+    # Auto refresh for custom collection property does not work without tagging a redraw
+    """ Redraws given windows area of specific type """
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.spaces[0].type == space_type:
+                for region in area.regions:
+                    if region.type == region_type:
+                        region.tag_redraw()
+
+
+def set_active_and_select(obj):
+    bpy.context.view_layer.objects.active = obj
+    for selected in bpy.context.selected_objects:
+        selected.select_set(False)
+    obj.select_set(True)
+
+
 def singleton(cls):
     instances = {}
 
@@ -175,7 +221,6 @@ class SceneManager(object):
             self.scene.objects.clear()
 
         self.scene = burg.core.Scene(ground_area=ground_area)
-        # reset instance id
         self.color_id = 0
 
     def load_scene(self, scene_file=None):
@@ -269,7 +314,6 @@ class SceneManager(object):
         """
         Removes all blender objects and their meshes   
         """
-
         for key in self.blender_to_burg.keys():
             obj = bpy.data.objects[key]
             mesh = bpy.data.meshes[obj.data.name]
@@ -476,49 +520,3 @@ class SceneManager(object):
         except Exception as e:
             print("Error during synchronize.")
             print(e)
-
-
-def get_stable_poses(instance):
-    stable_poses = []
-    for pose in instance.object_type.stable_poses:
-        new_pose = pose[1].copy()
-        new_pose[0, 3] = 0
-        new_pose[1, 3] = 0
-        stable_poses.append(mathutils.Matrix(new_pose))
-
-    return stable_poses
-
-
-def update_display_colors():
-    burg_params = bpy.context.scene.burg_params
-    burg_objects = [o for o in bpy.data.objects if o.get("burg_object_type")]
-    if burg_params.view_mode == 'view_color':
-        for o in burg_objects:
-            o.color = o["burg_color"]
-    elif burg_params.view_mode == 'view_state':
-        for o in burg_objects:
-            o.color[:3] = BURG_STATUS_COLORS[o["burg_status"]]
-
-
-def trigger_display_update(params):
-    if params.view_mode == 'view_state':
-        params.view_mode = 'view_state'
-
-
-def tag_redraw(context, space_type="PROPERTIES", region_type="WINDOW"):
-    # https://blender.stackexchange.com/questions/45138/buttons-for-custom-properties-dont-refresh-when-changed-by-other-parts-of-the-s
-    # Auto refresh for custom collection property does not work without tagging a redraw
-    """ Redraws given windows area of specific type """
-    for window in context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.spaces[0].type == space_type:
-                for region in area.regions:
-                    if region.type == region_type:
-                        region.tag_redraw()
-
-
-def set_active_and_select(obj):
-    bpy.context.view_layer.objects.active = obj
-    for selected in bpy.context.selected_objects:
-        selected.select_set(False)
-    obj.select_set(True)

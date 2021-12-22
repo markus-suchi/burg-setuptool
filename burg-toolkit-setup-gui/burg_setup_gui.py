@@ -70,7 +70,6 @@ class BURG_OT_update_scene(bpy.types.Operator):
         return (context is not None and mng.is_valid_scene())
 
     def execute(self, context):
-        print("Update scene")
         bpy.context.window.cursor_set("WAIT")
         mng.synchronize()
         mng.update_scene_poses()
@@ -99,9 +98,10 @@ class BURG_OT_load_object_library(bpy.types.Operator):
             # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
             burg_params.object_library_file = self.filepath
+            mng.remove_blender_objects()
             mng.empty_scene(burg_params.object_library_file,
                             ground_area=utils.get_size(burg_params.area_size))
-            update_burg_objects(self, context)
+            update_previews(self, context)
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
@@ -194,15 +194,12 @@ class BURG_OT_load_scene(bpy.types.Operator):
         try:
             bpy.context.window.cursor_set("WAIT")
             mng.load_scene(self.filepath)
-            # TODO: Error handling when opening incomplete/not processed library file.
             burg_params = context.scene.burg_params
             burg_params.object_library_file = mng.object_library_file
-            update_burg_objects(self, context)
+            update_previews(self, context)
             utils.update_display_colors()
             mng.lock_transform(burg_params.lock_transform)
-
             burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
-
             utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
@@ -355,7 +352,6 @@ class BURG_PT_printout(bpy.types.Panel):
 
 
 # OBJECT BROWSER OPERATORS
-
 class BURG_OT_add_object(bpy.types.Operator):
     """
     Adds new object to scene
@@ -444,26 +440,16 @@ class BURG_PT_object_preview(bpy.types.Panel):
 
 
 # OBJECT BROWSER PROPERTIES
-class BURG_PG_object(bpy.types.PropertyGroup):
-    id: bpy.props.StringProperty(name="Id")
-    name: bpy.props.StringProperty(name="Name")
-
-
 def update_burg_object_index(self, context):
-
     scene = context.scene
     if scene.burg_object_index >= 0 and scene.burg_object_list:
         item = scene.burg_object_list[scene.burg_object_index]
 
 
-def update_burg_objects(self, context):
+def update_previews(self, context):
     global burg_object_previews
 
     scene = context.scene
-    # Unfortunately this gets called everytime one clicks or opens the dialog
-    # Even if canceling the dialog
-    # Maybe make old and new entry compare and only reload when dirty
-
     try:
         mng = utils.SceneManager()
         bol = mng.object_library
@@ -514,8 +500,13 @@ def set_stable_poses(self, value):
 def get_stable_poses(self):
     return self.get("burg_stable_poses", 0)
 
-# SCENE PROPERTIES
 
+class BURG_PG_object(bpy.types.PropertyGroup):
+    id: bpy.props.StringProperty(name="Id")
+    name: bpy.props.StringProperty(name="Name")
+
+
+# SCENE PROPERTIES
 
 def update_lock_transform(self, context):
     burg_params = context.scene.burg_params
@@ -590,6 +581,7 @@ class delete_override(bpy.types.Operator):
 
     bl_idname = "object.delete"
     bl_label = "Object Delete Operator"
+    bl_options = {"REGISTER", "UNDO"}
     use_global: bpy.props.BoolProperty()
     confirm: bpy.props.BoolProperty()
 
@@ -726,7 +718,6 @@ def register():
     bpy.app.handlers.undo_post.append(sync_handler)
     bpy.app.handlers.redo_post.append(sync_handler)
     bpy.app.handlers.load_post.append(load_handler)
-    # bpy.app.handlers.load_post.append(load_handler)
 
 
 def unregister():
@@ -746,7 +737,6 @@ def unregister():
 
     bpy.app.handlers.undo_post.remove(sync_handler)
     bpy.app.handlers.redo_post.remove(sync_handler)
-    # bpy.app.handlers.load_post.remove(load_handler)
     bpy.app.handlers.load_post.remove(load_handler)
 
 
