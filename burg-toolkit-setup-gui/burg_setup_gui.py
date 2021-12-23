@@ -677,6 +677,8 @@ classes = (
 
 # KEYMAPS
 addon_keymaps = []
+
+
 def add_keymap():
     global addon_keymaps
     wm = bpy.context.window_manager
@@ -685,7 +687,7 @@ def add_keymap():
     if kc:
         km = wm.keyconfigs.addon.keymaps.new(
             name='3D View', space_type='VIEW_3D')
-        
+
         kmi = km.keymap_items.new(
             BURG_OT_save_scene.bl_idname, 'S', 'PRESS', ctrl=True, shift=True)
         addon_keymaps.append((km, kmi))
@@ -698,6 +700,10 @@ def add_keymap():
             BURG_OT_update_scene.bl_idname, 'V', 'PRESS', ctrl=True, shift=True)
         addon_keymaps.append((km, kmi))
 
+        # kmi = km.keymap_items.new(
+        # BURG_OT_add_object.bl_idname, 'LEFTMOUSE', 'DOUBLE_CLICK', ctrl=False, shift=False)
+        # addon_keymaps.append((km, kmi))
+
 
 def register():
     for cls in classes:
@@ -708,7 +714,7 @@ def register():
 
     bpy.types.Scene.burg_objects = bpy.props.CollectionProperty(
         name="BURG Objects",
-        type=BURG_PG_object
+        type=BURG_PG_object,
     )
 
     bpy.types.Scene.burg_object_index = bpy.props.IntProperty(
@@ -726,13 +732,13 @@ def register():
 
     add_keymap()
 
+
 def unregister():
     global burg_object_previews
 
     for km, kmi in addon_keymaps:
         km.keymap_items.remove(kmi)
     addon_keymaps.clear()
-
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
@@ -749,6 +755,7 @@ def unregister():
     bpy.app.handlers.undo_post.remove(sync_handler)
     bpy.app.handlers.redo_post.remove(sync_handler)
     bpy.app.handlers.load_post.remove(load_handler)
+
 
 if __name__ == "__main__":
     register()
