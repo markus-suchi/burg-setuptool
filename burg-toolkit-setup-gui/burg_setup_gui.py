@@ -217,9 +217,9 @@ class BURG_OT_load_scene(bpy.types.Operator):
 
 
 # SCENE PANELS
-class BURG_PT_object_library(bpy.types.Panel):
-    bl_label = "Scene"
-    bl_idname = "BURG_PT_object_library"
+class BURG_PT_get_started(bpy.types.Panel):
+    bl_label = "Get Started..."
+    bl_idname = "BURG_PT_get_started"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "BURG Setup Template"
@@ -243,21 +243,17 @@ class BURG_PT_object_library(bpy.types.Panel):
 
         burg_params = scene.burg_params
         row = layout.row()
-        row.operator("burg.load_object_library", text='Open Object Library')
+        row.operator("burg.load_object_library", text='Load Object Library')
         row = layout.row()
-        row.operator("burg.load_scene", text="Import")
-        row = layout.row()
-        row.operator("burg.save_scene", text="Export")
-        row = layout.row()
-        row.prop(burg_params, "area_size", text="Size")
+        row.operator("burg.load_scene", text="Load Scene")
         row = layout.row()
         row.enabled = False
         row.prop(burg_params, "object_library_file")
 
 
-class BURG_PT_scene(bpy.types.Panel):
-    bl_label = "Actions"
-    bl_idname = "BURG_PT_scene"
+class BURG_PT_settings(bpy.types.Panel):
+    bl_label = "Settings"
+    bl_idname = "BURG_PT_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "BURG Setup Template"
@@ -276,23 +272,16 @@ class BURG_PT_scene(bpy.types.Panel):
         burg_params = scene.burg_params
 
         row = layout.row()
-        row.operator("burg.update_scene")
-        row = layout.row()
         row.prop(burg_params, "view_mode", text="Display", expand=True)
         row = layout.row()
-        row.prop(burg_params, "lock_transform", text="Lock Move")
+        row.prop(burg_params, "lock_transform", text="Restrict Movement")
         row = layout.row()
-        row.prop(burg_params, "view_simulation")
-
-        if obj and mng.has_stable_poses(obj):
-            row = layout.row()
-            row.prop(context.active_object,
-                     "burg_stable_poses", text="Stable Poses")
+        row.prop(burg_params, "view_simulation", text="Show Simulation")
 
 
-class BURG_PT_new_scene(bpy.types.Panel):
-    bl_label = "Create"
-    bl_idname = "BURG_PT_new_scene"
+class BURG_PT_scene(bpy.types.Panel):
+    bl_label = "Scene"
+    bl_idname = "BURG_PT_scene"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "BURG Setup Template"
@@ -303,7 +292,6 @@ class BURG_PT_new_scene(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        obj = context.object
         layout.use_property_split = True
         layout.use_property_decorate = False
 
@@ -311,44 +299,79 @@ class BURG_PT_new_scene(bpy.types.Panel):
         burg_params = scene.burg_params
 
         row = layout.row()
-        row.operator("burg.empty_scene", text="Empty")
-        row = layout.row()
-        row.operator("burg.random_scene", text='Random')
-        row = layout.row()
         row.prop(burg_params, "area_size", text='Size')
+        row = layout.row()
+        row.operator("burg.empty_scene", text="Clear Scene")
+        row = layout.row()
+        row.operator("burg.save_scene", text="Save Scene")
+        row = layout.row()
+        row.operator("burg.save_printout", text='Save Printout')
+        row = layout.row()
+        row.prop(burg_params, "printout_size", text='Page Size')
+        row = layout.row()
+        row.prop(burg_params, "printout_margin", text='Margin (mm)')
+        row = layout.row()
+        row.operator("burg.update_scene", text="Validate & Simulate")
+
+
+class BURG_PT_object_selection(bpy.types.Panel):
+    """Selection panel for objects"""
+
+    bl_label = "Object Placement"
+    bl_idname = "BURG_PT_object_selection"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "BURG Setup Template"
+
+    @classmethod
+    def poll(self, context):
+        return (context is not None and utils.SceneManager().is_valid_object_library())
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+        obj = context.active_object
+        scene = context.scene
+        burg_params = context.scene.burg_params
+        row = layout.row()
+        row.operator("burg.random_scene", text='Random Configuration')
         row = layout.row()
         row.prop(burg_params, "number_objects", text='#Objects')
         row = layout.row()
         row.prop(burg_params, "number_instances", text='#Instances')
+        row = layout.row()
+        row.label(text="Object Selector")
+        row = layout.row()
+        row.template_list("BURG_UL_objects", "", scene,
+                          "burg_objects", scene, "burg_object_index", rows=5)
+        row = layout.row()
+        row.operator("burg.add_object", text="Add Object")
+
+        if obj and mng.has_stable_poses(obj) and obj.select_get():
+            row = layout.row()
+            row.prop(context.active_object,
+                     "burg_stable_poses", text="Stable Poses")
 
 
-class BURG_PT_printout(bpy.types.Panel):
-    bl_label = "Printout"
-    bl_idname = "BURG_PT_printout"
-    bl_space_type = "VIEW_3D"
-    bl_region_type = "UI"
+class BURG_PT_object_preview(bpy.types.Panel):
+    """Preview panel for selected object"""
+
+    bl_label = "Preview"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_idname = "BURG_PT_object_preview"
+    bl_parent_id = "BURG_PT_object_selection"
     bl_category = "BURG Setup Template"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(self, context):
-        return (context is not None and mng.is_valid_scene())
 
     def draw(self, context):
+        global burg_object_previews
+
         layout = self.layout
-        obj = context.object
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
         scene = context.scene
-        burg_params = scene.burg_params
-
-        row = layout.row()
-        row.operator("burg.save_printout", text='Save')
-        row = layout.row()
-        row.prop(burg_params, "printout_size", text='Size')
-        row = layout.row()
-        row.prop(burg_params, "printout_margin", text='Margin (mm)')
+        if scene.burg_objects and scene.burg_object_index >= 0 and burg_object_previews:
+            key = scene.burg_objects[scene.burg_object_index]
+            layout.template_icon(burg_object_previews[key.id].icon_id, scale=7)
 
 
 # OBJECT BROWSER OPERATORS
@@ -388,55 +411,19 @@ class BURG_UL_objects(bpy.types.UIList):
     List of available objects
     """
 
+    first_run: bpy.props.BoolProperty(name="first_run", default=True)
+
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         global burg_object_previews
+
+        if self.first_run:
+            self.use_filter_show = True
+            self.use_filter_sort_alpha = True
+            self.first_run = False
 
         if item and burg_object_previews:
             layout.label(text=item.name,
                          icon_value=burg_object_previews[item.id].icon_id)
-
-
-class BURG_PT_object_selection(bpy.types.Panel):
-    """Selection panel for objects"""
-
-    bl_label = "Objects"
-    bl_idname = "BURG_PT_object_selection"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "BURG Setup Template"
-
-    @classmethod
-    def poll(self, context):
-        return (context is not None and utils.SceneManager().is_valid_object_library())
-
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        row = layout.row()
-        row.template_list("BURG_UL_objects", "", scene,
-                          "burg_objects", scene, "burg_object_index", rows=5)
-        row = layout.row()
-        row.operator("burg.add_object")
-
-
-class BURG_PT_object_preview(bpy.types.Panel):
-    """Preview panel for selected object"""
-
-    bl_label = "Preview"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_idname = "BURG_PT_object_preview"
-    bl_parent_id = "BURG_PT_object_selection"
-    bl_category = "BURG Setup Template"
-
-    def draw(self, context):
-        global burg_object_previews
-
-        layout = self.layout
-        scene = context.scene
-        if scene.burg_objects and scene.burg_object_index >= 0 and burg_object_previews:
-            key = scene.burg_objects[scene.burg_object_index]
-            layout.template_icon(burg_object_previews[key.id].icon_id, scale=7)
 
 
 # OBJECT BROWSER PROPERTIES
@@ -549,7 +536,9 @@ class BURG_PG_params(bpy.types.PropertyGroup):
     number_instances: bpy.props.IntProperty(
         name="#Instances used for Random Scene.", default=1, min=1)
     view_simulation: bpy.props.BoolProperty(
-        name="View Simulation", default=False)
+        name="View Simulation", default=False,
+        description="Enables viewing realtime simulation. Do not "
+        "close the window, instead wait until the simulation has finished")
     object_library_file: bpy.props.StringProperty(
         name="Object Library", default="")
     lock_transform: bpy.props.BoolProperty(
@@ -665,9 +654,11 @@ def sync_handler(scene):
 
 
 classes = (
-    BURG_PT_object_library,
-    BURG_PT_new_scene,
+    BURG_PT_get_started,
     BURG_PT_scene,
+    BURG_PT_object_selection,
+    BURG_PT_object_preview,
+    BURG_PT_settings,
 
     BURG_OT_update_scene,
     BURG_OT_empty_scene,
@@ -678,20 +669,34 @@ classes = (
     BURG_OT_save_printout,
 
     BURG_PG_params,
-
-    BURG_PT_object_selection,
-    BURG_PT_object_preview,
-
-    BURG_PT_printout,
-
     BURG_OT_add_object,
-
     BURG_UL_objects,
-
     BURG_PG_object,
-
     delete_override,
 )
+
+# KEYMAPS
+addon_keymaps = []
+def add_keymap():
+    global addon_keymaps
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+
+    if kc:
+        km = wm.keyconfigs.addon.keymaps.new(
+            name='3D View', space_type='VIEW_3D')
+        
+        kmi = km.keymap_items.new(
+            BURG_OT_save_scene.bl_idname, 'S', 'PRESS', ctrl=True, shift=True)
+        addon_keymaps.append((km, kmi))
+
+        kmi = km.keymap_items.new(
+            BURG_OT_save_printout.bl_idname, 'P', 'PRESS', ctrl=True, shift=True)
+        addon_keymaps.append((km, kmi))
+
+        kmi = km.keymap_items.new(
+            BURG_OT_update_scene.bl_idname, 'V', 'PRESS', ctrl=True, shift=True)
+        addon_keymaps.append((km, kmi))
 
 
 def register():
@@ -719,9 +724,15 @@ def register():
     bpy.app.handlers.redo_post.append(sync_handler)
     bpy.app.handlers.load_post.append(load_handler)
 
+    add_keymap()
 
 def unregister():
     global burg_object_previews
+
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
@@ -738,7 +749,6 @@ def unregister():
     bpy.app.handlers.undo_post.remove(sync_handler)
     bpy.app.handlers.redo_post.remove(sync_handler)
     bpy.app.handlers.load_post.remove(load_handler)
-
 
 if __name__ == "__main__":
     register()
