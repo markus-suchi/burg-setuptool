@@ -237,12 +237,13 @@ class SceneManager(object):
                 # TODO: First load might include a incomplete library
                 # Now importing it again after creating it works
                 # If files can be checked before this should move to GUI
+                self.remove_blender_objects()
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 self.load_object_library(library.filename)
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 if scene and library:
                     if self.scene:
-                        self.remove_blender_objects()
+                        # self.remove_blender_objects()
                         self.scene.objects.clear()
 
                     self.scene = scene

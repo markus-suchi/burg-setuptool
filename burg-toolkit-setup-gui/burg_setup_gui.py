@@ -8,6 +8,7 @@ import burg_setup_gui_utils as utils
 
 import os
 import numpy as np
+import traceback
 
 # the one and only manager
 mng = utils.SceneManager()
@@ -48,6 +49,7 @@ class BURG_OT_empty_scene(bpy.types.Operator):
     def execute(self, context):
         bpy.context.window.cursor_set("WAIT")
         burg_params = context.scene.burg_params
+        mng.synchronize()
         mng.remove_blender_objects()
         mng.empty_scene(burg_params.object_library_file,
                         ground_area=utils.get_size(
@@ -89,6 +91,8 @@ class BURG_OT_load_object_library(bpy.types.Operator):
 
     bl_idname = "burg.load_object_library"
     bl_label = "Load Object Library"
+    bl_options = {"REGISTER", "UNDO"}
+
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
     filter_glob: bpy.props.StringProperty(default="*.yaml")
 
@@ -106,8 +110,11 @@ class BURG_OT_load_object_library(bpy.types.Operator):
             bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
-            print(f"Could not open burg object library: {self.filepath}.")
-            print(e)
+            tb = traceback.format_exc()
+            text = str(
+                f"Could not open burg object library: {self.filepath}\n{e}\n{tb}")
+            print(text)
+            self.report({'ERROR'}, text)
             bpy.context.window.cursor_set("DEFAULT")
             return {'CANCELLED'}
 
@@ -132,16 +139,40 @@ class BURG_OT_save_printout(bpy.types.Operator):
 
     def execute(self, context):
         try:
+            bpy.context.window.cursor_set("WAIT")
+            #check and simulate current scene
+            mng.synchronize()
+            mng.update_scene_poses()
             burg_params = context.scene.burg_params
-            print_size = utils.get_size(burg_params.printout_size)
-            printout = burg.printout.Printout(size=mng.scene.ground_area)
-            printout.add_scene(mng.scene)
-            printout.save_pdf(self.filepath, page_size=print_size,
-                              margin_mm=burg_params.printout_margin)
+            invalid = False
+            if(mng.check_status()):
+                mng.simulate_scene(verbose=False)
+                mng.update_blender_poses()
+                if(mng.check_status()):
+                    print_size = utils.get_size(burg_params.printout_size)
+                    printout = burg.printout.Printout(size=mng.scene.ground_area)
+                    printout.add_scene(mng.scene)
+                    printout.save_pdf(self.filepath, page_size=print_size,
+                                      margin_mm=burg_params.printout_margin)
+                else:
+                    invalid = True
+            else:
+                invalid = True
+
+            if invalid:
+                #status of object not clear cannot save printout
+                text = f"Could not safe printout. Some objects are obstructed or out of bounds."
+                self.report({'WARNING'}, text)
+
+            utils.trigger_display_update(burg_params)
+            bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
-            print(f"Could not save template file: {self.filepath}.")
-            print(e)
+            tb = traceback.format_exc()
+            text = f"Could not save template file: {self.filepath}\n{e}\n{tb}"
+            print(text)
+            self.report({'ERROR'}, text)
+            bpy.context.window.cursor_set("DEFAULT")
             return {'CANCELLED'}
 
     def invoke(self, context, event):
@@ -165,12 +196,28 @@ class BURG_OT_save_scene(bpy.types.Operator):
 
     def execute(self, context):
         try:
+            bpy.context.window.cursor_set("WAIT")
+            #check and simulate current scene
+            mng.synchronize()
+            mng.update_scene_poses()
+            if(mng.check_status()):
+                mng.simulate_scene(verbose=False)
+                mng.update_blender_poses()
+                mng.check_status()
+
+            burg_params = context.scene.burg_params
+            utils.trigger_display_update(burg_params)
+
             # printout parameter necessary?
             mng.save_scene(self.filepath)
+            bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
-            print(f"Could not save scene file: {self.filepath}.")
-            print(e)
+            tb = traceback.format_exc()
+            text = str(f"Could not save scene file: {self.filepath}:\n{e}\n{tb}")
+            print(text)
+            self.report({'ERROR'}, text)
+            bpy.context.window.cursor_set("DEFAULT")
             return {'CANCELLED'}
 
     def invoke(self, context, event):
@@ -204,8 +251,10 @@ class BURG_OT_load_scene(bpy.types.Operator):
             bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
-            print(f"Could not load scene file: {self.filepath}.")
-            print(e)
+            tb = traceback.format_exc()
+            text = str(f"Could not load scene file: {self.filepath}\n{e}\n{tb}")
+            print(text)
+            self.report({'ERROR'}, text)
             bpy.context.window.cursor_set("DEFAULT")
             return {'CANCELLED'}
 
@@ -595,6 +644,38 @@ class delete_override(bpy.types.Operator):
             return self.execute(context)
 
 
+class delete_outliner_override(bpy.types.Operator):
+    # Overriding delete operator
+    # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
+    """delete objects and their derivatives"""
+
+    bl_idname = "outliner.delete"
+    bl_label = "Object Delete Operator"
+    bl_options = {"REGISTER", "UNDO"}
+    use_global: bpy.props.BoolProperty()
+    confirm: bpy.props.BoolProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def execute(self, context):
+        mng = utils.SceneManager()
+        for obj in context.selected_objects:
+            if mng.is_burg_object(obj):
+                mng.remove_object(obj)
+            else:
+                bpy.data.objects.remove(obj)
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        if event.type == 'X':
+            return context.window_manager.invoke_confirm(self, event)
+        else:
+            return self.execute(context)
+
+
 @persistent
 def load_handler(scene):
     # Blender does not allow to store persistent data over several blend files.
@@ -673,6 +754,7 @@ classes = (
     BURG_UL_objects,
     BURG_PG_object,
     delete_override,
+    # delete_outliner_override,
 )
 
 # KEYMAPS
