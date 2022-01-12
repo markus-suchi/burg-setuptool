@@ -140,7 +140,7 @@ class BURG_OT_save_printout(bpy.types.Operator):
     def execute(self, context):
         try:
             bpy.context.window.cursor_set("WAIT")
-            #check and simulate current scene
+            # check and simulate current scene
             mng.synchronize()
             mng.update_scene_poses()
             burg_params = context.scene.burg_params
@@ -150,7 +150,8 @@ class BURG_OT_save_printout(bpy.types.Operator):
                 mng.update_blender_poses()
                 if(mng.check_status()):
                     print_size = utils.get_size(burg_params.printout_size)
-                    printout = burg.printout.Printout(size=mng.scene.ground_area)
+                    printout = burg.printout.Printout(
+                        size=mng.scene.ground_area)
                     printout.add_scene(mng.scene)
                     printout.save_pdf(self.filepath, page_size=print_size,
                                       margin_mm=burg_params.printout_margin)
@@ -160,7 +161,7 @@ class BURG_OT_save_printout(bpy.types.Operator):
                 invalid = True
 
             if invalid:
-                #status of object not clear cannot save printout
+                # status of object not clear cannot save printout
                 text = f"Could not safe printout. Some objects are obstructed or out of bounds."
                 self.report({'WARNING'}, text)
 
@@ -197,7 +198,7 @@ class BURG_OT_save_scene(bpy.types.Operator):
     def execute(self, context):
         try:
             bpy.context.window.cursor_set("WAIT")
-            #check and simulate current scene
+            # check and simulate current scene
             mng.synchronize()
             mng.update_scene_poses()
             if(mng.check_status()):
@@ -214,7 +215,8 @@ class BURG_OT_save_scene(bpy.types.Operator):
             return {'FINISHED'}
         except Exception as e:
             tb = traceback.format_exc()
-            text = str(f"Could not save scene file: {self.filepath}:\n{e}\n{tb}")
+            text = str(
+                f"Could not save scene file: {self.filepath}:\n{e}\n{tb}")
             print(text)
             self.report({'ERROR'}, text)
             bpy.context.window.cursor_set("DEFAULT")
@@ -252,7 +254,8 @@ class BURG_OT_load_scene(bpy.types.Operator):
             return {'FINISHED'}
         except Exception as e:
             tb = traceback.format_exc()
-            text = str(f"Could not load scene file: {self.filepath}\n{e}\n{tb}")
+            text = str(
+                f"Could not load scene file: {self.filepath}\n{e}\n{tb}")
             print(text)
             self.report({'ERROR'}, text)
             bpy.context.window.cursor_set("DEFAULT")
