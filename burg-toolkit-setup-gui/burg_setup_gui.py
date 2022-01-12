@@ -490,7 +490,6 @@ def update_previews(self, context):
         mng = utils.SceneManager()
         bol = mng.object_library
         if not mng.is_valid_object_library():
-            print("Object library is invalid.")
             return
 
         if burg_object_previews:
@@ -701,6 +700,7 @@ def sync_handler(scene):
             mng.blender_to_burg.clear()
             if burg_object_previews:
                 bpy.utils.previews.remove(burg_object_previews)
+                burg_object_previews = None
             if bpy.context.scene.burg_objects:
                 burg_objects.clear()
         return
@@ -724,10 +724,10 @@ def sync_handler(scene):
             mng.object_library_file = None
             if burg_object_previews:
                 bpy.utils.previews.remove(burg_object_previews)
+                burg_object_previews = None
             if bpy.context.scene.burg_objects:
                 burg_objects.clear()
         else:
-            # not mng.is_valid_scene() and not current_library_file
             for area in bpy.context.screen.areas:
                 area.tag_redraw()
 
@@ -753,7 +753,7 @@ classes = (
     BURG_OT_add_object,
     BURG_UL_objects,
     BURG_PG_object,
-    delete_override,
+    # delete_override,
     # delete_outliner_override,
 )
 
@@ -781,10 +781,6 @@ def add_keymap():
         kmi = km.keymap_items.new(
             BURG_OT_update_scene.bl_idname, 'V', 'PRESS', ctrl=True, shift=True)
         addon_keymaps.append((km, kmi))
-
-        # kmi = km.keymap_items.new(
-        # BURG_OT_add_object.bl_idname, 'LEFTMOUSE', 'DOUBLE_CLICK', ctrl=False, shift=False)
-        # addon_keymaps.append((km, kmi))
 
 
 def register():
