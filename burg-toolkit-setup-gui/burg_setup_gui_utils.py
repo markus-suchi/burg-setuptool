@@ -237,12 +237,13 @@ class SceneManager(object):
                 # TODO: First load might include a incomplete library
                 # Now importing it again after creating it works
                 # If files can be checked before this should move to GUI
+                self.remove_blender_objects()
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 self.load_object_library(library.filename)
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
                 if scene and library:
                     if self.scene:
-                        self.remove_blender_objects()
+                        # self.remove_blender_objects()
                         self.scene.objects.clear()
 
                     self.scene = scene
@@ -317,12 +318,15 @@ class SceneManager(object):
         Removes all blender objects and their meshes   
         """
         for key in self.blender_to_burg.keys():
-            obj = bpy.data.objects[key]
-            mesh = bpy.data.meshes[obj.data.name]
-            bpy.data.objects.remove(obj, do_unlink=True)
-            # check if we are the last user for this mesh
-            if mesh.users < 1:
-                bpy.data.meshes.remove(mesh, do_unlink=True)
+            # The blender object can be deleted before an update to the blender_to_burg map during Undo/Redo actions
+            # Therfore no remove is necessary
+            if key in bpy.data.objects.keys():
+                obj = bpy.data.objects[key]
+                mesh = bpy.data.meshes[obj.data.name]
+                bpy.data.objects.remove(obj, do_unlink=True)
+                # check if we are the last user for this mesh
+                if mesh.users < 1:
+                    bpy.data.meshes.remove(mesh, do_unlink=True)
 
         self.blender_to_burg.clear()
         self.color_id = 0
@@ -504,7 +508,6 @@ class SceneManager(object):
 
                 update_display_colors()
 
-                # TODO: need to also update printout?
                 size = get_size(bpy.context.scene.burg_params.area_size)
                 if not self.scene.ground_area == size:
                     self.scene.ground_area = size
