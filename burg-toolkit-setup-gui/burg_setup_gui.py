@@ -66,6 +66,7 @@ class BURG_OT_update_scene(bpy.types.Operator):
 
     bl_idname = "burg.update_scene"
     bl_label = "Update"
+    bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(self, context):
