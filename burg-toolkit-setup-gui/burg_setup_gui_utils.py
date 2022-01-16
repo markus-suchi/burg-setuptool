@@ -167,7 +167,7 @@ class SceneManager(object):
 
         if not filepath or not os.path.isfile(filepath):
             raise ValueError(
-                f"Object Library File {object_lib_file} does not exist.")
+                f"Object Library File {filepath} does not exist.")
 
         if not self.same_object_library(filepath):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
