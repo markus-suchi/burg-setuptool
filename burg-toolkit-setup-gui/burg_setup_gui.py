@@ -144,7 +144,7 @@ class BURG_OT_library_completion_confirm(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
    
     scenepath: bpy.props.StringProperty(subtype="FILE_PATH", default="", options={'HIDDEN'})
-    currentpath: bpy.props.StringProperty(subtype="FILE_PATH", default="object_library.yaml", options={'HIDDEN'})
+    currentpath: bpy.props.StringProperty(default="object_library.yaml", options={'HIDDEN'})
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="object_library.yaml", options={'HIDDEN'})
     save_to: bpy.props.EnumProperty(name="Save to", description="Save completed library using current or new file.",
                                  items={
@@ -157,6 +157,7 @@ class BURG_OT_library_completion_confirm(bpy.types.Operator):
         return True
 
     def execute(self, context):
+        print("Execute Library completions")
         if self.save_to == "A_New_File":
             bpy.ops.burg.library_completion('INVOKE_DEFAULT', 
                                             scenepath=self.scenepath, 
@@ -174,7 +175,15 @@ class BURG_OT_library_completion_confirm(bpy.types.Operator):
     def draw(self, context):
         layout = self.layout
         row = layout.row()
-        row.label(text="The chosen object library is incomplete.")
+        row.label(text="The current object library:")
+        row = layout.row()
+        row.enabled = False
+        row.prop(self, "currentpath", text="",)
+        row = layout.row()
+        if not self.scenepath:
+            row.label(text="is incomplete.")
+        else:
+            row.label(text="of this scene is incomplete.")
         row = layout.row()
         row.label(text="You can complete it now by saving to:")
         row = layout.row()
@@ -372,12 +381,14 @@ class BURG_OT_load_scene(bpy.types.Operator):
                 bpy.context.window.cursor_set("DEFAULT")
             elif object_library and not object_library.objects_have_all_attributes():
                 # parameterize and call confirmation dialog
+                print(f"DEBUG: {object_library.filename} ")
+                print(f"DEBUG: {bpy.path.abspath(object_library.filename)} ")
                 bpy.ops.burg.library_completion_confirm('INVOKE_DEFAULT', 
                                                         filepath = object_library.filename, 
-                                                        currentpath = object_library.filename,
+                                                        currentpath = os.path.normpath(object_library.filename),
                                                         scenepath = self.filepath)
             else:
-                self.report({'ERROR'}, f"Could not open object library: {self.filepath}")
+                self.report({'ERROR'}, f"Could not load scene file: {self.filepath}")
                 bpy.context.window.cursor_set("DEFAULT")
                 return {'CANCELLED'}
             return {'FINISHED'}
@@ -645,6 +656,8 @@ def update_previews(self, context):
                 resources_folder = utils.get_resources_folder()
                 burg_object_previews.load(
                     item.id, os.path.join(resources_folder, 'missing_image.png'), 'IMAGE')
+
+        scene.burg_object_index=0
     except Exception as e:
         print(f"An error occurred creating previews.")
         print(e)
