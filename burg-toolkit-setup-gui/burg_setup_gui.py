@@ -157,7 +157,6 @@ class BURG_OT_library_completion_confirm(bpy.types.Operator):
         return True
 
     def execute(self, context):
-        print("Execute Library completions")
         if self.save_to == "A_New_File":
             bpy.ops.burg.library_completion('INVOKE_DEFAULT', 
                                             scenepath=self.scenepath, 
@@ -381,8 +380,6 @@ class BURG_OT_load_scene(bpy.types.Operator):
                 bpy.context.window.cursor_set("DEFAULT")
             elif object_library and not object_library.objects_have_all_attributes():
                 # parameterize and call confirmation dialog
-                print(f"DEBUG: {object_library.filename} ")
-                print(f"DEBUG: {bpy.path.abspath(object_library.filename)} ")
                 bpy.ops.burg.library_completion_confirm('INVOKE_DEFAULT', 
                                                         filepath = object_library.filename, 
                                                         currentpath = os.path.normpath(object_library.filename),
