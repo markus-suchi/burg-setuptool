@@ -752,71 +752,7 @@ class BURG_PG_params(bpy.types.PropertyGroup):
         name="Printout Margin", default=0.0, min=0.0)
 
 
-# GENERAL OPERATORS
-class delete_override(bpy.types.Operator):
-    # Overriding delete operator
-    # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
-    """delete objects and their derivatives"""
-
-    bl_idname = "object.delete"
-    bl_label = "Object Delete Operator"
-    bl_options = {"REGISTER", "UNDO"}
-    use_global: bpy.props.BoolProperty()
-    confirm: bpy.props.BoolProperty()
-
-    @classmethod
-    def poll(cls, context):
-        return context.active_object is not None
-
-    def execute(self, context):
-        mng = utils.SceneManager()
-        for obj in context.selected_objects:
-            if mng.is_burg_object(obj):
-                mng.remove_object(obj)
-            else:
-                bpy.data.objects.remove(obj)
-
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        if event.type == 'X':
-            return context.window_manager.invoke_confirm(self, event)
-        else:
-            return self.execute(context)
-
-
-class delete_outliner_override(bpy.types.Operator):
-    # Overriding delete operator
-    # From: https://blender.stackexchange.com/questions/135122/how-to-prepend-to-delete-operator
-    """delete objects and their derivatives"""
-
-    bl_idname = "outliner.delete"
-    bl_label = "Object Delete Operator"
-    bl_options = {"REGISTER", "UNDO"}
-    use_global: bpy.props.BoolProperty()
-    confirm: bpy.props.BoolProperty()
-
-    @classmethod
-    def poll(cls, context):
-        return context.active_object is not None
-
-    def execute(self, context):
-        mng = utils.SceneManager()
-        for obj in context.selected_objects:
-            if mng.is_burg_object(obj):
-                mng.remove_object(obj)
-            else:
-                bpy.data.objects.remove(obj)
-
-        return {'FINISHED'}
-
-    def invoke(self, context, event):
-        if event.type == 'X':
-            return context.window_manager.invoke_confirm(self, event)
-        else:
-            return self.execute(context)
-
-
+# APP HANDLER 
 @persistent
 def load_handler(scene):
     # Blender does not allow to store persistent data over several blend files.
@@ -900,8 +836,6 @@ classes = (
     BURG_OT_add_object,
     BURG_UL_objects,
     BURG_PG_object,
-    # delete_override,
-    # delete_outliner_override,
     BURG_OT_library_completion,
     BURG_OT_library_completion_confirm,
 )
