@@ -146,7 +146,7 @@ class SceneManager(object):
     def set_area_size(self, size):
         self.scene.ground_area = get_size(size)
 
-    def complete_object_library(self):
+    def complete_object_library(self, savepath):
         lib = self.object_library
 
         if lib and not lib.objects_have_all_attributes():
@@ -156,9 +156,9 @@ class SceneManager(object):
             engine = burg.render.RenderEngineFactory.create('pybullet')
             lib.generate_thumbnails(render_engine=engine, override=False)
             engine.dismiss()
-            lib.to_yaml(lib.filename)
+            lib.to_yaml(savepath)
 
-    def load_object_library(self, filepath):
+    def load_object_library(self, filepath, savepath=None):
         """
         Loads and updates object library related interface items.
 
@@ -169,11 +169,15 @@ class SceneManager(object):
             raise ValueError(
                 f"Object Library File {filepath} does not exist.")
 
+        # If no savepath is given we override and use filepath
+        if not savepath:
+            savepath = filepath
+
         if not self.same_object_library(filepath):
             self.object_library = burg.ObjectLibrary.from_yaml(filepath)
-            self.object_library_file = filepath
-            self.complete_object_library()
-
+            self.complete_object_library(savepath)
+            self.object_library.filepath = savepath
+            self.object_library_file = savepath
         # Loading a new object_library invalidates the scene and mapping
         self.blender_to_burg.clear()
         self.scene = None
@@ -206,7 +210,7 @@ class SceneManager(object):
         for item in self.scene.objects:
             self.add_burg_instance_to_blender(item)
 
-    def empty_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3):
+    def empty_scene(self, object_library_file=None, ground_area=burg.constants.SIZE_A3, savepath=None):
         """
         Creates an empty scene.
 
@@ -214,7 +218,7 @@ class SceneManager(object):
         :param ground_area: Size of the working area.
         """
 
-        self.load_object_library(object_library_file)
+        self.load_object_library(object_library_file, savepath=savepath)
 
         if self.scene:
             self.remove_blender_objects()
@@ -223,7 +227,7 @@ class SceneManager(object):
         self.scene = burg.core.Scene(ground_area=ground_area)
         self.color_id = 0
 
-    def load_scene(self, scene_file=None):
+    def load_scene(self, scene_file=None, savepath=None):
         """
         Loads a scene from file.
 
@@ -234,18 +238,13 @@ class SceneManager(object):
             print(f"The scene file {scene_file} does not exist.")
         else:
             try:
-                # TODO: First load might include a incomplete library
-                # Now importing it again after creating it works
-                # If files can be checked before this should move to GUI
                 self.remove_blender_objects()
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
-                self.load_object_library(library.filename)
-                scene, library, printout = burg.Scene.from_yaml(scene_file)
+                self.load_object_library(library.filename, savepath = savepath)
+                scene, library, printout = burg.Scene.from_yaml(scene_file, object_library = self.object_library)
                 if scene and library:
                     if self.scene:
-                        # self.remove_blender_objects()
                         self.scene.objects.clear()
-
                     self.scene = scene
                     self.scene.object_library = self.object_library
                     self.blender_to_burg.clear()
@@ -407,6 +406,10 @@ class SceneManager(object):
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
         obj["burg_object_type"] = instance.object_type.identifier
+        #TODO: A bug in blender if rotation mode is set to Euler some rotation is added in blender
+        # This can be verified by switching between QUATERNION and XYZ rotation mode
+        # in blender. The switching alone can cause rotation for some objects
+        obj.rotation_mode = 'QUATERNION'
         obj.matrix_world = mathutils.Matrix(instance.pose)
         obj.color = color
         add_material(obj)
