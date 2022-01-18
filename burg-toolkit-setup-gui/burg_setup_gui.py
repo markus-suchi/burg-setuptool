@@ -385,7 +385,7 @@ class BURG_OT_load_scene(bpy.types.Operator):
                                                         currentpath = os.path.normpath(object_library.filename),
                                                         scenepath = self.filepath)
             else:
-                self.report({'ERROR'}, f"Could not load scene file: {self.filepath}")
+                self.report({'ERROR'}, f"Could not load scene file: {self.filepath}. Object Library not available.")
                 bpy.context.window.cursor_set("DEFAULT")
                 return {'CANCELLED'}
             return {'FINISHED'}
