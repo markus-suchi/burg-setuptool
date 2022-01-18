@@ -21,6 +21,7 @@ class BURG_OT_random_scene(bpy.types.Operator):
     bl_idname = "burg.random_scene"
     bl_label = "Create Random Scene"
     bl_options = {"REGISTER", "UNDO"}
+    bl_description = "Creates a Random Scene.\nOne could assume that we sample N objects in K instances of each object,\n leading to NxK total instances in the scene"
 
     def execute(self, context):
         bpy.context.window.cursor_set("WAIT")
@@ -524,7 +525,7 @@ class BURG_PT_object_selection(bpy.types.Panel):
         scene = context.scene
         burg_params = context.scene.burg_params
         row = layout.row()
-        row.operator("burg.random_scene", text='Random Configuration')
+        row.operator("burg.random_scene", text='Random Configuration' )
         row = layout.row()
         row.prop(burg_params, "number_objects", text='#Objects')
         row = layout.row()
