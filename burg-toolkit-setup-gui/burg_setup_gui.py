@@ -95,7 +95,7 @@ class BURG_OT_load_object_library(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
-    filter_glob: bpy.props.StringProperty(default="*.yaml", options={'HIDDEN'})
+    filter_glob: bpy.props.StringProperty(name="Filter", default="*.yaml")
 
     def execute(self, context):
         try:
@@ -199,10 +199,10 @@ class BURG_OT_library_completion(bpy.types.Operator):
     bl_label = "Complete Object Library"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
     
-    scenepath: bpy.props.StringProperty(subtype="FILE_PATH")
-    currentpath: bpy.props.StringProperty(subtype="FILE_PATH")
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
-    filter_glob: bpy.props.StringProperty(default="*.yaml")
+    scenepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'} )
+    currentpath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'} )
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'})
+    filter_glob: bpy.props.StringProperty(name="Filter", default="*.yaml")
 
     @classmethod
     def poll(cls, context):
@@ -361,7 +361,7 @@ class BURG_OT_load_scene(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="*.yaml")
-    filter_glob: bpy.props.StringProperty(default="*.yaml")
+    filter_glob: bpy.props.StringProperty(name="Filter", default="*.yaml")
 
     def execute(self, context):
         try:
