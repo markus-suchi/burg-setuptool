@@ -240,8 +240,9 @@ class SceneManager(object):
             try:
                 self.remove_blender_objects()
                 scene, library, printout = burg.Scene.from_yaml(scene_file)
-                self.load_object_library(library.filename, savepath = savepath)
-                scene, library, printout = burg.Scene.from_yaml(scene_file, object_library = self.object_library)
+                self.load_object_library(library.filename, savepath=savepath)
+                scene, library, printout = burg.Scene.from_yaml(
+                    scene_file, object_library=self.object_library)
                 if scene and library:
                     if self.scene:
                         self.scene.objects.clear()
@@ -406,7 +407,7 @@ class SceneManager(object):
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
         obj["burg_object_type"] = instance.object_type.identifier
-        #TODO: A bug in blender if rotation mode is set to Euler some rotation is added in blender
+        # TODO: A bug in blender if rotation mode is set to Euler some rotation is added in blender
         # This can be verified by switching between QUATERNION and XYZ rotation mode
         # in blender. The switching alone can cause rotation for some objects
         obj.rotation_mode = 'QUATERNION'

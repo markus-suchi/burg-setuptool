@@ -110,13 +110,16 @@ class BURG_OT_load_object_library(bpy.types.Operator):
                                 ground_area=utils.get_size(burg_params.area_size))
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
-                utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+                utils.tag_redraw(
+                    context, space_type='VIEW_3D', region_type='UI')
                 bpy.context.window.cursor_set("DEFAULT")
             elif object_library and not object_library.objects_have_all_attributes():
                 # parameterize and call confirmation dialog
-                bpy.ops.burg.library_completion_confirm('INVOKE_DEFAULT', filepath = self.filepath, currentpath=self.filepath)
+                bpy.ops.burg.library_completion_confirm(
+                    'INVOKE_DEFAULT', filepath=self.filepath, currentpath=self.filepath)
             else:
-                self.report({'ERROR'}, f"Could not open object library: {self.filepath}")
+                self.report(
+                    {'ERROR'}, f"Could not open object library: {self.filepath}")
                 bpy.context.window.cursor_set("DEFAULT")
                 return {'CANCELLED'}
             return {'FINISHED'}
@@ -136,36 +139,38 @@ class BURG_OT_load_object_library(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-
-
 class BURG_OT_library_completion_confirm(bpy.types.Operator):
     """Confirm Object Library Completion"""
     bl_idname = "burg.library_completion_confirm"
     bl_label = "Complete Object Library"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
-   
-    scenepath: bpy.props.StringProperty(subtype="FILE_PATH", default="", options={'HIDDEN'})
-    currentpath: bpy.props.StringProperty(default="object_library.yaml", options={'HIDDEN'})
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH", default="object_library.yaml", options={'HIDDEN'})
+
+    scenepath: bpy.props.StringProperty(
+        subtype="FILE_PATH", default="", options={'HIDDEN'})
+    currentpath: bpy.props.StringProperty(
+        default="object_library.yaml", options={'HIDDEN'})
+    filepath: bpy.props.StringProperty(
+        subtype="FILE_PATH", default="object_library.yaml", options={'HIDDEN'})
     save_to: bpy.props.EnumProperty(name="Save to", description="Save completed library using current or new file.",
-                                 items={
-                                 ("A_New_File", "New File", "Save as new file", 0),
-                                 ("B_Current_File", "Current File", "Overwrite current file", 1)},
-                                 default=0)
-                            
+                                    items={
+                                        ("A_New_File", "New File",
+                                         "Save as new file", 0),
+                                        ("B_Current_File", "Current File", "Overwrite current file", 1)},
+                                    default=0)
+
     @classmethod
     def poll(cls, context):
         return True
 
     def execute(self, context):
         if self.save_to == "A_New_File":
-            bpy.ops.burg.library_completion('INVOKE_DEFAULT', 
-                                            scenepath=self.scenepath, 
-                                            filepath=self.filepath, 
+            bpy.ops.burg.library_completion('INVOKE_DEFAULT',
+                                            scenepath=self.scenepath,
+                                            filepath=self.filepath,
                                             currentpath=self.currentpath)
         else:
-            bpy.ops.burg.library_completion(scenepath=self.scenepath, 
-                                            filepath=self.filepath, 
+            bpy.ops.burg.library_completion(scenepath=self.scenepath,
+                                            filepath=self.filepath,
                                             currentpath=self.currentpath)
         return {'FINISHED'}
 
@@ -187,7 +192,7 @@ class BURG_OT_library_completion_confirm(bpy.types.Operator):
         row = layout.row()
         row.label(text="You can complete it now by saving to:")
         row = layout.row()
-        row.prop(self,"save_to", text="", expand=False)
+        row.prop(self, "save_to", text="", expand=False)
         row = layout.row()
         row.label(text="Please be patient, as completion can take some time.")
         row = layout.row()
@@ -199,9 +204,11 @@ class BURG_OT_library_completion(bpy.types.Operator):
     bl_idname = "burg.library_completion"
     bl_label = "Complete Object Library"
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
-    
-    scenepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'} )
-    currentpath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'} )
+
+    scenepath: bpy.props.StringProperty(
+        subtype="FILE_PATH", options={'HIDDEN'})
+    currentpath: bpy.props.StringProperty(
+        subtype="FILE_PATH", options={'HIDDEN'})
     filepath: bpy.props.StringProperty(subtype="FILE_PATH", options={'HIDDEN'})
     filter_glob: bpy.props.StringProperty(name="Filter", default="*.yaml")
 
@@ -214,23 +221,27 @@ class BURG_OT_library_completion(bpy.types.Operator):
             bpy.context.window.cursor_set("WAIT")
             if self.scenepath:
                 burg_params = context.scene.burg_params
-                mng.load_scene(scene_file=self.scenepath, savepath=self.filepath)
+                mng.load_scene(scene_file=self.scenepath,
+                               savepath=self.filepath)
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
                 utils.update_display_colors()
                 mng.lock_transform(burg_params.lock_transform)
                 burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
-                utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+                utils.tag_redraw(
+                    context, space_type='VIEW_3D', region_type='UI')
                 bpy.context.window.cursor_set("DEFAULT")
             else:
                 burg_params = context.scene.burg_params
                 mng.remove_blender_objects()
                 mng.empty_scene(self.currentpath,
-                                ground_area=utils.get_size(burg_params.area_size),
+                                ground_area=utils.get_size(
+                                    burg_params.area_size),
                                 savepath=self.filepath)
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
-                utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+                utils.tag_redraw(
+                    context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
             return {'FINISHED'}
         except Exception as e:
@@ -353,7 +364,6 @@ class BURG_OT_save_scene(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-
 class BURG_OT_load_scene(bpy.types.Operator):
     """ Loading scene setup from file """
 
@@ -377,16 +387,19 @@ class BURG_OT_load_scene(bpy.types.Operator):
                 utils.update_display_colors()
                 mng.lock_transform(burg_params.lock_transform)
                 burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
-                utils.tag_redraw(context, space_type='VIEW_3D', region_type='UI')
+                utils.tag_redraw(
+                    context, space_type='VIEW_3D', region_type='UI')
                 bpy.context.window.cursor_set("DEFAULT")
             elif object_library and not object_library.objects_have_all_attributes():
                 # parameterize and call confirmation dialog
-                bpy.ops.burg.library_completion_confirm('INVOKE_DEFAULT', 
-                                                        filepath = object_library.filename, 
-                                                        currentpath = os.path.normpath(object_library.filename),
-                                                        scenepath = self.filepath)
+                bpy.ops.burg.library_completion_confirm('INVOKE_DEFAULT',
+                                                        filepath=object_library.filename,
+                                                        currentpath=os.path.normpath(
+                                                            object_library.filename),
+                                                        scenepath=self.filepath)
             else:
-                self.report({'ERROR'}, f"Could not load scene file: {self.filepath}. Object Library not available.")
+                self.report(
+                    {'ERROR'}, f"Could not load scene file: {self.filepath}. Object Library not available.")
                 bpy.context.window.cursor_set("DEFAULT")
                 return {'CANCELLED'}
             return {'FINISHED'}
@@ -525,7 +538,7 @@ class BURG_PT_object_selection(bpy.types.Panel):
         scene = context.scene
         burg_params = context.scene.burg_params
         row = layout.row()
-        row.operator("burg.random_scene", text='Random Configuration' )
+        row.operator("burg.random_scene", text='Random Configuration')
         row = layout.row()
         row.prop(burg_params, "number_objects", text='#Objects')
         row = layout.row()
@@ -655,7 +668,7 @@ def update_previews(self, context):
                 burg_object_previews.load(
                     item.id, os.path.join(resources_folder, 'missing_image.png'), 'IMAGE')
 
-        scene.burg_object_index=0
+        scene.burg_object_index = 0
     except Exception as e:
         print(f"An error occurred creating previews.")
         print(e)
@@ -753,7 +766,7 @@ class BURG_PG_params(bpy.types.PropertyGroup):
         name="Printout Margin", default=0.0, min=0.0)
 
 
-# APP HANDLER 
+# APP HANDLER
 @persistent
 def load_handler(scene):
     # Blender does not allow to store persistent data over several blend files.
@@ -789,7 +802,7 @@ def sync_handler(scene):
     if mng.object_library:
         mng_library_file = mng.object_library.filename
 
-    #TODO: Important note on UNDO operation:
+    # TODO: Important note on UNDO operation:
     #      Switching between library files with same name which are
     #      Incomplete / Complete does not reload the library
     #      Also it is unclear what should be the real state since you cannot
