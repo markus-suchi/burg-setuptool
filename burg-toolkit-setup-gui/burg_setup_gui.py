@@ -110,6 +110,7 @@ class BURG_OT_load_object_library(bpy.types.Operator):
                                 ground_area=utils.get_size(burg_params.area_size))
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
+                burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
                 utils.tag_redraw(
                     context, space_type='VIEW_3D', region_type='UI')
                 bpy.context.window.cursor_set("DEFAULT")
@@ -240,6 +241,7 @@ class BURG_OT_library_completion(bpy.types.Operator):
                                 savepath=self.filepath)
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
+                burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
                 utils.tag_redraw(
                     context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
@@ -437,21 +439,27 @@ class BURG_PT_get_started(bpy.types.Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        scene = context.scene
-        flow = layout.grid_flow(row_major=True,
-                                columns=0,
-                                even_columns=True,
-                                even_rows=False,
-                                align=True)
+        if is_burg_available():
+            scene = context.scene
+            flow = layout.grid_flow(row_major=True,
+                                    columns=0,
+                                    even_columns=True,
+                                    even_rows=False,
+                                    align=True)
 
-        burg_params = scene.burg_params
-        row = layout.row()
-        row.operator("burg.load_object_library", text='Load Object Library')
-        row = layout.row()
-        row.operator("burg.load_scene", text="Load Scene")
-        row = layout.row()
-        row.enabled = False
-        row.prop(burg_params, "object_library_file")
+            burg_params = scene.burg_params
+            row = layout.row()
+            row.operator("burg.load_object_library", text='Load Object Library')
+            row = layout.row()
+            row.operator("burg.load_scene", text="Load Scene")
+            row = layout.row()
+            row.enabled = False
+            row.prop(burg_params, "object_library_file")
+        else:
+            row = layout.row()
+            row.label(text = "Create a new session with:")
+            row = layout.row()
+            row.label(text = "File -> New -> BURG Setup Template")
 
 
 class BURG_PT_settings(bpy.types.Panel):
@@ -460,10 +468,12 @@ class BURG_PT_settings(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "BURG Setup Template"
+    bl_options= {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(self, context):
-        return (context is not None and utils.SceneManager().is_valid_object_library())
+        return (context is not None and utils.SceneManager().is_valid_object_library()
+                and is_burg_available())
 
     def draw(self, context):
         layout = self.layout
@@ -491,7 +501,8 @@ class BURG_PT_scene(bpy.types.Panel):
 
     @classmethod
     def poll(self, context):
-        return (context is not None and utils.SceneManager().is_valid_object_library())
+        return (context is not None and utils.SceneManager().is_valid_object_library()
+                and is_burg_available())
 
     def draw(self, context):
         layout = self.layout
@@ -528,7 +539,8 @@ class BURG_PT_object_selection(bpy.types.Panel):
 
     @classmethod
     def poll(self, context):
-        return (context is not None and utils.SceneManager().is_valid_object_library())
+        return (context is not None and utils.SceneManager().is_valid_object_library() 
+                and is_burg_available())
 
     def draw(self, context):
         layout = self.layout
@@ -589,7 +601,8 @@ class BURG_OT_add_object(bpy.types.Operator):
 
     @classmethod
     def poll(self, context):
-        return (context is not None and mng.is_valid_scene())
+        return (context is not None and mng.is_valid_scene()
+                and is_burg_available())
 
     def execute(self, context):
         scene = context.scene
@@ -720,6 +733,7 @@ def update_area_size(self, context):
     img.pixels[:] = utils.convert_numpy_image(np_image)
     img.update()
 
+    plane.hide_set(False)
     if mng.is_valid_scene():
         mng.set_area_size(burg_params.area_size)
         if mng.check_status():
@@ -733,6 +747,8 @@ def update_area_size(self, context):
 def update_display_colors(self, context):
     utils.update_display_colors()
 
+def is_burg_available():
+    return "burg_version" in bpy.context.scene
 
 class BURG_PG_params(bpy.types.PropertyGroup):
     number_objects: bpy.props.IntProperty(
