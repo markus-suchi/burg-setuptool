@@ -110,6 +110,7 @@ class BURG_OT_load_object_library(bpy.types.Operator):
                                 ground_area=utils.get_size(burg_params.area_size))
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
+                burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
                 utils.tag_redraw(
                     context, space_type='VIEW_3D', region_type='UI')
                 bpy.context.window.cursor_set("DEFAULT")
@@ -240,6 +241,7 @@ class BURG_OT_library_completion(bpy.types.Operator):
                                 savepath=self.filepath)
                 burg_params.object_library_file = self.filepath
                 update_previews(self, context)
+                burg_params.area_size = utils.BURG_TO_BLENDER_SIZES[mng.scene.ground_area]
                 utils.tag_redraw(
                     context, space_type='VIEW_3D', region_type='UI')
             bpy.context.window.cursor_set("DEFAULT")
@@ -460,6 +462,7 @@ class BURG_PT_settings(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "BURG Setup Template"
+    bl_options= {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(self, context):
@@ -720,6 +723,7 @@ def update_area_size(self, context):
     img.pixels[:] = utils.convert_numpy_image(np_image)
     img.update()
 
+    plane.hide_set(False)
     if mng.is_valid_scene():
         mng.set_area_size(burg_params.area_size)
         if mng.check_status():
