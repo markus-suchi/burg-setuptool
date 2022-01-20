@@ -80,7 +80,10 @@ cd ~/blender-2.92.0-linux64/2.92/python/bin
 
 Get started by:
 - Opening an object library yaml file and then composing scenes, or
-- Importing a scene, which automatically loads an object library
+- Importing a scene, which automatically loads an object library 
+
+As an example, you can download an object library and two scenes in [setuptool-examples.zip](https://drive.google.com/file/d/17CqIyr3KndNl3fT2dXhQrDfgaNAT0mxz/view?usp=drivesdk) [10.4MB].
+The two objects are borrowed from the [YCB dataset](http://ycb-benchmarks.s3-website-us-east-1.amazonaws.com/).
 
 Rotating the view:
 - use num pad to rotate
