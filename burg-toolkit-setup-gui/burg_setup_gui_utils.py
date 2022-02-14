@@ -407,10 +407,11 @@ class SceneManager(object):
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
         obj["burg_object_type"] = instance.object_type.identifier
-        # TODO: A bug in blender if rotation mode is set to Euler some rotation is added in blender
+        # TODO: A bug in blender if rotation mode is set to Euler some very small rotation is 
+        # added in blender
         # This can be verified by switching between QUATERNION and XYZ rotation mode
         # in blender. The switching alone can cause rotation for some objects
-        obj.rotation_mode = 'QUATERNION'
+        # obj.rotation_mode = 'QUATERNION'
         obj.matrix_world = mathutils.Matrix(instance.pose)
         obj.color = color
         add_material(obj)
