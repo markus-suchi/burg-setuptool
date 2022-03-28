@@ -1,9 +1,9 @@
 bl_info = {
     "author": "Markus Suchi",
-    "name": "BURG toolkit - Setup GUI",
+    "name": "BURG-SetupTool",
     "description": "GUI for creating BURG setup templates.",
     "warning": "",
-    "version": (0, 1),
+    "version": (0, 2),
     "blender": (2, 92, 0),
     "support": 'TESTING',
     "category": 'User Interface'
@@ -17,6 +17,7 @@ else:
     import os
     import shutil
     import sys
+
 
     # --- create the startup file for the burg setup gui ---
     script_file = os.path.abspath(__file__)
