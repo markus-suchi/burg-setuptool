@@ -18,7 +18,6 @@ else:
     import shutil
     import sys
 
-
     # --- create the startup file for the burg setup gui ---
     script_file = os.path.abspath(__file__)
     addon_dir = os.path.dirname(script_file)
@@ -28,12 +27,23 @@ else:
     startup_dir = os.path.join(
         script_dir, 'startup', 'bl_app_templates_system')
     burg_setup_gui_startup_dir = os.path.join(
-        startup_dir, 'BURG_Setup_Template')
+        startup_dir, 'BURG_SetupTool')
     burg_setup_gui_startup_file = os.path.join(
         burg_setup_gui_startup_dir, 'startup.blend')
     burg_setup_gui_startup_file_source = os.path.join(
         addon_dir, 'burg-toolkit-setup-gui', 'burg_setup_gui.blend')
 
+    # --- remove old startup file ---
+    burg_setup_gui_startup_dir_old = os.path.join(
+        startup_dir, 'BURG_Setup_Template')
+    burg_setup_gui_startup_file_old = os.path.join(
+        burg_setup_gui_startup_dir_old, 'startup.blend')
+    if os.path.exists(burg_setup_gui_startup_file_old):
+        os.remove(burg_setup_gui_startup_file_old)
+    if os.path.exists(burg_setup_gui_startup_dir_old):
+        os.rmdir(burg_setup_gui_startup_dir_old)
+
+    # --- copy new startup file ---
     if os.path.exists(startup_dir):
         if not os.path.exists(burg_setup_gui_startup_dir):
             os.mkdir(burg_setup_gui_startup_dir)
