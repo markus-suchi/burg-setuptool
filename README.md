@@ -1,7 +1,9 @@
 # BURG SetupTool for BURG toolkit
 
 This tool provides an easy way to compose table top scene arrangements in blender. The created scenes are used to provide printable reproducible startup object configurations for grasping experiments.
-The application is a front end of the [BURG toolkit](https://github.com/mrudorfer/burg-toolkit/) library and provides the following features:
+The application is a front end of the [BURG toolkit](https://github.com/mrudorfer/burg-toolkit/) library for **B**enchmarking and **U**nderstanding **R**obotic **G**rasping, developed 
+in the scope of [BURG project](#references).
+It provides the following features:
 - ability of creating/loading/saving scenes
 - adding/removing/manipulating objects
 - validating layouts using physics simulation
@@ -14,9 +16,9 @@ Printable pdf files can be saved to 3 available page sizes (A2, A3, A4), and can
 ![printouts](./doc/printouts.png)
 
 
-# installation of BURG SetupTool
+## installation of BURG SetupTool
 
-## install blender
+### install blender
 
 We specifically require version 2.92. Other versions unfortunately do not work, due to compatibility issues.
 
@@ -42,7 +44,7 @@ Make blender callable in the app menu:
 Make blender callable in the command line:
 - `sudo ln -s ~/blender-2.92.0-linux64/blender /usr/local/bin/blender292`
 
-## install setup tool as blender addon
+### install setup tool as blender addon
 
 Clone the repository, add it to blender add ons:
 ```
@@ -61,7 +63,7 @@ cd ~/blender-2.92.0-linux64/2.92/python/bin
 ./python3.7m -m pip install ~/burg-setuptool/burg-toolkit['collision']
 ```
 
-### activate the blender addon
+#### activate the blender addon
 - Start blender, either from command line (see debug outputs) or from the app menu, as configured before
 - Open "Edit" -> "Preferences..."
 - Go to "Add-ons", activate "Testing" tab at the top
@@ -69,7 +71,7 @@ cd ~/blender-2.92.0-linux64/2.92/python/bin
 
 This concludes the installation.
 
-## upgrade
+### upgrade
 
 If you want to upgrade to a new version, these steps are required:
 ```
@@ -180,6 +182,7 @@ You can then proceed to generate all further attributes as follows:
 ```
 lib.compute_all_attributes()  # takes long time
 lib.to_yaml()  # saves to same file as above
+```
 
 ## Acknowledgments
 
