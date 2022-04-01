@@ -1,10 +1,24 @@
-# Setup GUI for BURG toolkit
+# BURG SetupTool for BURG toolkit
 
-This is a blender addon which provides a GUI for creating burg-toolkit setup templates.
+This tool provides an easy way to compose table top scene arrangements in blender. The created scenes are used to provide printable reproducible startup object configurations for grasping experiments.
+The application is a front end of the [BURG toolkit](https://github.com/mrudorfer/burg-toolkit/) library for **B**enchmarking and **U**nderstanding **R**obotic **G**rasping, developed 
+in the scope of [BURG project](#references).
+It provides the following features:
+- ability of creating/loading/saving scenes
+- adding/removing/manipulating objects
+- validating layouts using physics simulation
+- creating printable templates for your experiments
 
-# installation of burg-toolkit-gui
+The left image shows an example scene created with the tool. Right image shows color coded status results of objects after validation.
+![overview](./doc/example.png)
 
-## install blender
+Printable pdf files can be saved to 3 available page sizes (A2, A3, A4), and can be split up if needed (eg. A2 -> 2 x A3).
+![printouts](./doc/printouts.png)
+
+
+## installation of BURG SetupTool
+
+### install blender
 
 We specifically require version 2.92. Other versions unfortunately do not work, due to compatibility issues.
 
@@ -24,20 +38,20 @@ Make blender callable in the app menu:
 - Open `~/blender-2.92.0-linux64/blender.desktop`, change entries:
 	- `Exec=/home/username/blender-2.92.0-linux64/blender %f`
 	- `Icon=/home/username/blender-2.92.0-linux64/blender.svg`
-	- `Name=Blender292`
+	-rk `Name=Blender292`
 - `cp ~/blender-2.92.0-linux64/blender.desktop ~/.local/share/applications`
 
 Make blender callable in the command line:
 - `sudo ln -s ~/blender-2.92.0-linux64/blender /usr/local/bin/blender292`
 
-## install setup tool as blender addon
+### install setup tool as blender addon
 
 Clone the repository, add it to blender add ons:
 ```
 cd ~
-git clone --recursive git@github.com:markus-suchi/burg-toolkit-gui.git
+git clone --recursive git@github.com:markus-suchi/burg-setuptool.git
 cd blender-2.92.0-linux64/2.92/scripts/addons
-ln -s ~/burg-toolkit-gui/ burg-toolkit-gui
+ln -s ~/burg-setuptool/ burg-setuptool
 ```
 
 Install dependencies in blender python:
@@ -46,35 +60,35 @@ cd ~/blender-2.92.0-linux64/2.92/python/bin
 ./python3.7m -m ensurepip
 ./python3.7m -m pip install --upgrade pip
 ./python3.7m -m pip install --upgrade setuptools wheel
-./python3.7m -m pip install ~/burg-toolkit-gui/burg-toolkit['collision']
+./python3.7m -m pip install ~/burg-setuptool/burg-toolkit['collision']
 ```
 
-### activate the blender addon
+#### activate the blender addon
 - Start blender, either from command line (see debug outputs) or from the app menu, as configured before
 - Open "Edit" -> "Preferences..."
 - Go to "Add-ons", activate "Testing" tab at the top
-- Click on the checkbox to activate "User Interface: BURG toolkit-Setup GUI" and close preferences
+- Click on the checkbox to activate "User Interface: BURG-SetupTool" and close preferences
 
 This concludes the installation.
 
-## upgrade
+### upgrade
 
 If you want to upgrade to a new version, these steps are required:
 ```
 # fetch changes to gui and toolkit
-cd burg-toolkit-gui
+cd burg-setuptool
 git pull
 git submodule update --recursive
 
 # rebuild toolkit
 cd ~/blender-2.92.0-linux64/2.92/python/bin
-./python3.7m -m pip install ~/burg-toolkit-gui/burg-toolkit['collision']
+./python3.7m -m pip install ~/burg-setuptool/burg-toolkit['collision']
 ```
 
 ## usage
 
 ### general
-- Choose "File" -> "New" -> "BURG Setup Template"
+- Choose "File" -> "New" -> "BURG SetupTool"
 - In the main window to the top right expand the Property Window
 - Select "BURG Setup Template" to see the addon menu
 
@@ -169,3 +183,14 @@ You can then proceed to generate all further attributes as follows:
 lib.compute_all_attributes()  # takes long time
 lib.to_yaml()  # saves to same file as above
 ```
+
+## Acknowledgments
+
+This work was conducted within the BURG research project for Benchmarking and Understanding Robotic Grasping. 
+It is supported by CHIST-ERA and the Austrian Science Foundation (FWF) grant no. I3967-N30 BURG.
+
+## References
+
+### research
+
+- BURG research project: https://burg.acin.tuwien.ac.at/`

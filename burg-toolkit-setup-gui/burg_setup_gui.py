@@ -427,7 +427,7 @@ class BURG_PT_get_started(bpy.types.Panel):
     bl_idname = "BURG_PT_get_started"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "BURG Setup Template"
+    bl_category = "BURG-SetupTool"
 
     @classmethod
     def poll(self, context):
@@ -459,7 +459,7 @@ class BURG_PT_get_started(bpy.types.Panel):
             row = layout.row()
             row.label(text = "Create a new session with:")
             row = layout.row()
-            row.label(text = "File -> New -> BURG Setup Template")
+            row.label(text = "File -> New -> BURG-SetupTool")
 
 
 class BURG_PT_settings(bpy.types.Panel):
@@ -467,7 +467,7 @@ class BURG_PT_settings(bpy.types.Panel):
     bl_idname = "BURG_PT_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "BURG Setup Template"
+    bl_category = "BURG-SetupTool"
     bl_options= {'DEFAULT_CLOSED'}
 
     @classmethod
@@ -497,7 +497,7 @@ class BURG_PT_scene(bpy.types.Panel):
     bl_idname = "BURG_PT_scene"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "BURG Setup Template"
+    bl_category = "BURG-SetupTool"
 
     @classmethod
     def poll(self, context):
@@ -535,7 +535,7 @@ class BURG_PT_object_selection(bpy.types.Panel):
     bl_idname = "BURG_PT_object_selection"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "BURG Setup Template"
+    bl_category = "BURG-SetupTool"
 
     @classmethod
     def poll(self, context):
@@ -577,7 +577,7 @@ class BURG_PT_object_preview(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_idname = "BURG_PT_object_preview"
     bl_parent_id = "BURG_PT_object_selection"
-    bl_category = "BURG Setup Template"
+    bl_category = "BURG-SetupTool"
 
     def draw(self, context):
         global burg_object_previews
