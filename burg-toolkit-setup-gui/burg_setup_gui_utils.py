@@ -256,10 +256,18 @@ class SceneManager(object):
                 print(e)
 
     def save_scene(self, scene_file=None):
+        """
+        Saves a scene to file.
+
+        :param scene_file: Path to a scene yaml file
+        """
+
         if scene_file:
             try:
                 # create a printout with current settings
-                self.scene.to_yaml(scene_file, self.object_library)
+                printout = burg.printout.Printout(size=self.scene.ground_area)
+                self.scene.to_yaml(
+                    scene_file, self.object_library, printout=printout)
             except Exception as e:
                 print(f"Could not save burg scene: {scene_file}")
                 print(e)
@@ -407,7 +415,7 @@ class SceneManager(object):
         obj["burg_color"] = color
         obj["burg_status"] = BurgStatus.OK
         obj["burg_object_type"] = instance.object_type.identifier
-        # TODO: A bug in blender if rotation mode is set to Euler some very small rotation is 
+        # TODO: A bug in blender if rotation mode is set to Euler some very small rotation is
         # added in blender
         # This can be verified by switching between QUATERNION and XYZ rotation mode
         # in blender. The switching alone can cause rotation for some objects
